@@ -1,53 +1,19 @@
 import React, { useState, useEffect } from "react";
 import "./App.css";
 import axios from "axios";
-import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import LoginForm from "./components/Auth/LoginForm";
-import SignupForm from "./components/Auth/SignupForm";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import { Textarea } from "./components/ui/textarea";
-import { Card, CardContent } from "./components/ui/card";
+import { Card, CardHeader, CardContent } from "./components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./components/ui/dialog";
 import { Badge } from "./components/ui/badge";
-import { Search, Plus, Calendar, CheckCircle2, Circle, Edit3, Trash2, LogOut, User } from "lucide-react";
+import { Search, Plus, Calendar, CheckCircle2, Circle, Edit3, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
 const API = `${BACKEND_URL}/api`;
 
-// Configure axios interceptor to add auth token
-axios.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('authToken');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-const AuthPage = () => {
-  const [isLogin, setIsLogin] = useState(true);
-
-  return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        {isLogin ? (
-          <LoginForm onToggleMode={() => setIsLogin(false)} />
-        ) : (
-          <SignupForm onToggleMode={() => setIsLogin(true)} />
-        )}
-      </div>
-    </div>
-  );
-};
-
-const TodoApp = () => {
-  const { user, logout, getIdToken } = useAuth();
+function App() {
   const [tasks, setTasks] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
@@ -61,20 +27,6 @@ const TodoApp = () => {
     due_date: ""
   });
 
-  // Update auth token when user changes
-  useEffect(() => {
-    const updateAuthToken = async () => {
-      if (user) {
-        const token = await getIdToken();
-        localStorage.setItem('authToken', token);
-      } else {
-        localStorage.removeItem('authToken');
-      }
-    };
-
-    updateAuthToken();
-  }, [user, getIdToken]);
-
   // Fetch tasks
   const fetchTasks = async (search = "") => {
     try {
@@ -83,9 +35,6 @@ const TodoApp = () => {
       setTasks(response.data);
     } catch (error) {
       console.error("Error fetching tasks:", error);
-      if (error.response?.status === 401) {
-        logout();
-      }
     } finally {
       setLoading(false);
     }
@@ -192,32 +141,19 @@ const TodoApp = () => {
     return dueDate < today;
   };
 
-  // Handle logout
-  const handleLogout = async () => {
-    try {
-      await logout();
-    } catch (error) {
-      console.error("Error logging out:", error);
-    }
-  };
-
   // Initial load
   useEffect(() => {
-    if (user) {
-      fetchTasks();
-    }
-  }, [user]);
+    fetchTasks();
+  }, []);
 
   // Search functionality
   useEffect(() => {
-    if (user) {
-      const timeoutId = setTimeout(() => {
-        fetchTasks(searchQuery);
-      }, 500);
+    const timeoutId = setTimeout(() => {
+      fetchTasks(searchQuery);
+    }, 500);
 
-      return () => clearTimeout(timeoutId);
-    }
-  }, [searchQuery, user]);
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery]);
 
   if (loading) {
     return (
@@ -230,30 +166,10 @@ const TodoApp = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-4xl mx-auto px-4 py-8">
-        {/* Header with user info */}
-        <div className="mb-8 flex justify-between items-start">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Lista de Tareas</h1>
-            <p className="text-gray-600">Organiza y gestiona tus tareas diarias</p>
-          </div>
-          
-          <div className="flex items-center gap-4">
-            <div className="text-right">
-              <div className="text-sm text-gray-500">Bienvenido</div>
-              <div className="font-medium text-gray-900">
-                {user?.displayName || user?.email}
-              </div>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleLogout}
-              className="flex items-center gap-2"
-            >
-              <LogOut className="h-4 w-4" />
-              Salir
-            </Button>
-          </div>
+        {/* Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Lista de Tareas</h1>
+          <p className="text-gray-600">Organiza y gestiona tus tareas diarias</p>
         </div>
 
         {/* Search and Add */}
@@ -474,24 +390,6 @@ const TodoApp = () => {
       </div>
     </div>
   );
-};
-
-function App() {
-  return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
-  );
 }
-
-const AppContent = () => {
-  const { user } = useAuth();
-  
-  return (
-    <div className="App">
-      {user ? <TodoApp /> : <AuthPage />}
-    </div>
-  );
-};
 
 export default App;
