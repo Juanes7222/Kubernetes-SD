@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from routers import tasks, lists
 
 # Atributos de la aplicación
 app = FastAPI(
@@ -7,4 +8,5 @@ app = FastAPI(
 )
 
 # Routers
-
+app.include_router(lists.router)
+app.include_router(tasks.router)
