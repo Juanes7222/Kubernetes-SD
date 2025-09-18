@@ -1,7 +1,10 @@
 from fastapi import FastAPI
 
-app = FastAPI()
+# Atributos de la aplicación
+app = FastAPI(
+    title="Kubernets-SD",
+    description="Monolito base para elaborar el trabajo de Sistemas Distribuidos"
+)
 
-@app.get("/")
-def read_root():
-    return {"message": "Hola desde FastAPI 🚀"}
+# Routers
+
