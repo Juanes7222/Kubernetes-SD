@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.116.2",
+    "firebase-admin>=7.1.0",
     "pydantic>=2.11.9",
     "uvicorn>=0.35.0",
 ]
