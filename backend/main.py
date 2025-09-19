@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request
 from routers import tasks, auth, logs
 from starlette.middleware.cors import CORSMiddleware
 from core.config import settings
-from logging_config import get_logger, request_log, write
+from core.logging_config import get_logger, request_log, write
 from starlette.responses import JSONResponse
 import time
 

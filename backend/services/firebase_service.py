@@ -4,9 +4,8 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 from fastapi import HTTPException
 from pathlib import Path
-from google.api_core.exceptions import FailedPrecondition
 from core.utils import to_firestore_dates, from_firestore_dates, safe_firebase_call
-from logging_config import get_logger
+from core.logging_config import get_logger
 
 logger = get_logger(__name__)
 
