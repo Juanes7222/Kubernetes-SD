@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 
 # Carpeta de logs
-LOG_DIR = Path(__file__).parent / "logs"
+LOG_DIR = Path(__file__).parent / "../logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 def get_logger(name: str = "kubernetes_sd") -> logging.Logger:

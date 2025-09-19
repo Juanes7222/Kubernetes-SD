@@ -3,7 +3,7 @@ from core.auth_middleware import get_current_user
 from services.firebase_service import firebase_service
 from models.schemas import Task, TaskCreate, TaskUpdate, CollaboratorIn
 from typing import List, Dict, Any, Optional
-from logging_config import get_logger, write
+from core.logging_config import get_logger, write
 
 logger = get_logger(__name__)
 
