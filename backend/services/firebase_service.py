@@ -1,4 +1,5 @@
 import firebase_admin
+import os
 from firebase_admin import credentials, firestore, auth
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
@@ -14,7 +15,13 @@ logger = get_logger(__name__)
 def initialize_firebase():
     if not firebase_admin._apps:
         # Ruta al archivo de credenciales
-        cred_path = Path(__file__).parent / '../secrets/kubernetes-sd.json'
+        cred_path = Path(
+           os.getenv("FIREBASE_CREDENTIALS", "/opt/render/secrets/kubernetes-sd.json")
+        )
+        
+        if not cred_path:
+            cred_path = Path(__file__).parent / 'secrets/kubernetes-sd.json'
+            
         cred = credentials.Certificate(str(cred_path))
         firebase_admin.initialize_app(cred)
     return firestore.client()
