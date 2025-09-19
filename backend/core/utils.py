@@ -1,4 +1,4 @@
-from logging_config import get_logger
+from core.logging_config import get_logger
 from fastapi import HTTPException
 from datetime import datetime, date
 

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, Request
 from typing import Optional
-from logging_config import get_logger, client_log, write
+from core.logging_config import get_logger, client_log, write
 
 logger = get_logger(__name__)
 

@@ -5,9 +5,8 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 from fastapi import HTTPException
 from pathlib import Path
-from google.api_core.exceptions import FailedPrecondition
 from core.utils import to_firestore_dates, get_path_credentials
-from logging_config import get_logger
+from core.logging_config import get_logger
 
 logger = get_logger(__name__)
 
@@ -130,9 +129,11 @@ class FirebaseTaskService:
         except Exception:
             raise HTTPException(status_code=500, detail="Error querying tasks")
 
-        tasks = []
+        tasks: List[Dict[str, Any]] = []
         for doc in docs:
             task = doc.to_dict()
+            if not task:
+                continue
             task["id"] = doc.id
             if search:
                 search_lower = search.lower()
@@ -181,10 +182,10 @@ class FirebaseTaskService:
         update_data = to_firestore_dates(update_data)
         doc_ref = self.collection.document(task_id)
         doc = doc_ref.get()
-        if not doc.exists:
-            logger.info("update_task: not found task_id=%s user=%s", task_id, user_id)
+        task = doc.to_dict() if doc else None
+        if not task:
+            logger.info("update_task: task not found task_id=%s", task_id)
             return None
-        task = doc.to_dict()
         # Solo owner o colaboradores pueden actualizar
         owner = task.get("owner_id") or task.get("user_id")
         collaborators = task.get("collaborators") or []
@@ -193,22 +194,21 @@ class FirebaseTaskService:
             return None
         doc_ref.update(update_data)
         updated_doc = doc_ref.get()
-        task = updated_doc.to_dict()
-        if not task:
-            logger.info("update_task: updated doc empty task_id=%s", task_id)
+        updated_task = updated_doc.to_dict()
+        if not updated_task:
             return None
-        task["id"] = updated_doc.id
-        return self._enrich_collaborators(task)
+        updated_task["id"] = updated_doc.id
+        return self._enrich_collaborators(updated_task)
     
     def delete_task(self, task_id: str, user_id: str) -> bool:
         """Delete a task for a specific user"""
         doc_ref = self.collection.document(task_id)
         doc = doc_ref.get()
-        if not doc.exists:
-            logger.info("delete_task: not found task_id=%s user=%s", task_id, user_id)
-            return False
-        task = doc.to_dict()
         # Solo owner puede eliminar (policy: solo owner borra)
+        task = doc.to_dict() if doc else None
+        if not task:
+            logger.info("delete_task: task not found task_id=%s", task_id)
+            return False
         owner = task.get("owner_id") or task.get("user_id")
         if owner != user_id:
             logger.info("delete_task: permission denied task_id=%s user=%s owner=%s", task_id, user_id, owner)
@@ -220,10 +220,10 @@ class FirebaseTaskService:
         """Toggle task completion status for a specific user"""
         doc_ref = self.collection.document(task_id)
         doc = doc_ref.get()
-        if not doc.exists:
-            logger.info("toggle_task_completion: not found task_id=%s user=%s", task_id, user_id)
+        task = doc.to_dict() if doc else None
+        if not task:
+            logger.info("toggle_task_completion: task not found task_id=%s", task_id)
             return None
-        task = doc.to_dict()
         # Owner o colaboradores pueden marcar completada
         owner = task.get("owner_id") or task.get("user_id")
         collaborators = task.get("collaborators") or []
@@ -232,20 +232,17 @@ class FirebaseTaskService:
             return None
         new_status = not task.get("completed", False)
         doc_ref.update({"completed": new_status})
-        updated_doc = doc_ref.get()
-        task = updated_doc.to_dict()
-        if not task:
+        updated_task = doc_ref.get().to_dict()
+        if not updated_task:
             return None
-        task["id"] = updated_doc.id
-        return self._enrich_collaborators(task)
+        updated_task["id"] = doc_ref.id
+        return self._enrich_collaborators(updated_task)
 
     # Métodos para gestionar colaboradores
     def add_collaborator(self, task_id: str, owner_id: str, collaborator: str) -> Optional[Dict[str, Any]]:
         doc_ref = self.collection.document(task_id)
         doc = doc_ref.get()
-        if not doc.exists:
-            return None
-        task = doc.to_dict()
+        task = doc.to_dict() if doc else None
         if not task:
             return None
         owner = task.get("owner_id") or task.get("user_id")
@@ -264,17 +261,17 @@ class FirebaseTaskService:
         if collaborator_uid not in collaborators:
             collaborators.append(collaborator_uid)
             doc_ref.update({"collaborators": collaborators})
-        task = doc_ref.get().to_dict()
-        task["id"] = doc_ref.id
+        updated_task = doc_ref.get().to_dict()
+        if not updated_task:
+            return None
+        updated_task["id"] = doc_ref.id
         logger.info(f"add_collaborator: task_id={task_id} owner={owner} added={collaborator_uid} collaborators={collaborators}")
-        return self._enrich_collaborators(task)
+        return self._enrich_collaborators(updated_task)
 
     def remove_collaborator(self, task_id: str, owner_id: str, collaborator_uid: str) -> Optional[Dict[str, Any]]:
         doc_ref = self.collection.document(task_id)
         doc = doc_ref.get()
-        if not doc.exists:
-            return None
-        task = doc.to_dict()
+        task = doc.to_dict() if doc else None
         if not task:
             return None
         owner = task.get("owner_id") or task.get("user_id")
@@ -290,16 +287,19 @@ class FirebaseTaskService:
                 logger.info(f"remove_collaborator: no user found for email {collaborator_uid}")
                 return None
             to_remove = user_info['uid']
-        logger.info(f"remove_collaborator: task_id={task_id} owner={owner} trying_remove={collaborator_uid} resolved={to_remove} collaborators_before={collaborators}")
+
         if to_remove in collaborators:
             collaborators = [c for c in collaborators if c != to_remove]
             doc_ref.update({"collaborators": collaborators})
             logger.info(f"remove_collaborator: removed {to_remove}, now collaborators={collaborators}")
         else:
             logger.info(f"remove_collaborator: {to_remove} not found in collaborators")
-        task = doc_ref.get().to_dict()
-        task["id"] = doc_ref.id
-        return self._enrich_collaborators(task)
+
+        updated_task = doc_ref.get().to_dict()
+        if not updated_task:
+            return None
+        updated_task["id"] = doc_ref.id
+        return self._enrich_collaborators(updated_task)
 
 
 # Create service instances

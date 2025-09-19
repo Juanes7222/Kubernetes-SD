@@ -2,8 +2,8 @@ import os
 import logging
 from pathlib import Path
 from dotenv import load_dotenv
-from logging_config import get_logger
 from core.utils import get_path_credentials
+from core.logging_config import get_logger
 
 # Directorio raíz del proyecto
 ROOT_DIR = Path(__file__).parent.parent
