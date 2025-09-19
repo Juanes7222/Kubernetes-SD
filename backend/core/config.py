@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 ROOT_DIR = Path(__file__).parent.parent
 
 # Cargar variables de entorno desde .env
-load_dotenv(ROOT_DIR / ".env")
+load_dotenv(ROOT_DIR / "secrets/.env")
 
 class Settings:
     PROJECT_NAME: str = "ToDo API with Auth"
