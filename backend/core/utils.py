@@ -1,8 +1,10 @@
 from core.logging_config import get_logger
 from fastapi import HTTPException
 from datetime import datetime, date
+import os
 
 logger = get_logger(__name__)
+DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 
 def to_firestore_dates(data: dict) -> dict:
     """
@@ -57,5 +59,7 @@ def get_path_credentials():
     cred_path = os.getenv("FIREBASE_CREDENTIALS", None)
     
     if not cred_path:
+        if not DEBUG:
+            raise EnvironmentError(f"FIREBASE_CREDENTIALS not defined in production | {DEBUG}")
         cred_path = Path(__file__).parent.parent / 'secrets/kubernetes-sd.json'
     return cred_path
