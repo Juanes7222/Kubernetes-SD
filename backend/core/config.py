@@ -3,6 +3,7 @@ import logging
 from pathlib import Path
 from dotenv import load_dotenv
 from logging_config import get_logger
+from core.utils import get_path_credentials
 
 # Directorio raíz del proyecto
 ROOT_DIR = Path(__file__).parent.parent
@@ -25,7 +26,7 @@ class Settings:
         CORS_ORIGINS = ["*"]
 
     # Firebase
-    FIREBASE_CREDENTIALS = ROOT_DIR / "secrets" / "kubernetes-sd.json"
+    FIREBASE_CREDENTIALS = get_path_credentials()
 
     # Flags
     DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"

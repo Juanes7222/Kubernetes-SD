@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from fastapi import HTTPException
 from pathlib import Path
 from google.api_core.exceptions import FailedPrecondition
-from core.utils import to_firestore_dates, from_firestore_dates, safe_firebase_call
+from core.utils import to_firestore_dates, get_path_credentials
 from logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -15,12 +15,7 @@ logger = get_logger(__name__)
 def initialize_firebase():
     if not firebase_admin._apps:
         # Ruta al archivo de credenciales
-        cred_path = Path(
-           os.getenv("FIREBASE_CREDENTIALS", "/opt/render/secrets/kubernetes-sd.json")
-        )
-        
-        if not cred_path:
-            cred_path = Path(__file__).parent / 'secrets/kubernetes-sd.json'
+        cred_path = get_path_credentials()
             
         cred = credentials.Certificate(str(cred_path))
         firebase_admin.initialize_app(cred)

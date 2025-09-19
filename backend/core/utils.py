@@ -45,3 +45,17 @@ async def safe_firebase_call(coro, *args, **kwargs):
     except Exception as e:
         logger.exception("Error en llamada a Firebase: %s", e)
         raise HTTPException(status_code=500, detail="Internal server error")
+    
+def get_path_credentials():
+    """
+    Obtiene la ruta a las credenciales de Firebase desde la variable de entorno
+    FIREBASE_CREDENTIALS o usa una ruta por defecto.
+    """
+    from pathlib import Path
+    import os
+
+    cred_path = os.getenv("FIREBASE_CREDENTIALS", None)
+    
+    if not cred_path:
+        cred_path = Path(__file__).parent.parent / 'secrets/kubernetes-sd.json'
+    return cred_path
