@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, List, Dict
 from datetime import datetime, timezone, date
 import uuid
 
@@ -10,6 +10,17 @@ class User(BaseModel):
     display_name: Optional[str] = None
     email_verified: bool = False
 
+class CollaboratorIn(BaseModel):
+    # Permitir enviar uid o email para identificar al colaborador
+    uid: Optional[str] = None
+    email: Optional[str] = None
+
+
+class Collaborator(BaseModel):
+    uid: str
+    email: Optional[str] = None
+    display_name: Optional[str] = None
+
 class Task(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     title: str
@@ -17,7 +28,10 @@ class Task(BaseModel):
     due_date: Optional[date] = None
     completed: bool = False
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
-    user_id: str
+    # owner_id es el UID del creador; se mantiene compatibilidad con `user_id` en DB
+    owner_id: str
+    # Lista de colaboradores (objetos con uid, email, display_name)
+    collaborators: Optional[List[Collaborator]] = None
 
 class TaskCreate(BaseModel):
     title: str
