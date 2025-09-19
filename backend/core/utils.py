@@ -1,7 +1,11 @@
 from core.logging_config import get_logger
 from fastapi import HTTPException
 from datetime import datetime, date
+from pathlib import Path
+from dotenv import load_dotenv
 import os
+
+load_dotenv(Path(__file__).parent.parent / "secrets/.env")
 
 logger = get_logger(__name__)
 DEBUG = os.getenv("DEBUG", "false").lower() == "true"
@@ -53,8 +57,6 @@ def get_path_credentials():
     Obtiene la ruta a las credenciales de Firebase desde la variable de entorno
     FIREBASE_CREDENTIALS o usa una ruta por defecto.
     """
-    from pathlib import Path
-    import os
 
     cred_path = os.getenv("FIREBASE_CREDENTIALS", None)
     
