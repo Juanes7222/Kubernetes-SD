@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from core.auth_middleware import get_current_user
 from services.firebase_service import firebase_service
-from models.schemas import Task, TaskCreate, TaskUpdate
+from models.schemas import Task, TaskCreate, TaskUpdate, CollaboratorIn
 from typing import List, Dict, Any, Optional
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
@@ -73,3 +73,31 @@ def toggle_task_completion(
     if not toggled_task:
         raise HTTPException(status_code=404, detail="Task not found")
     return Task(**toggled_task)
+
+
+@router.post("/{task_id}/collaborators", response_model=Task)
+def add_collaborator(
+    task_id: str,
+    payload: CollaboratorIn,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    identifier = payload.email if payload.email else payload.uid
+    if not identifier:
+        raise HTTPException(status_code=400, detail="Provide email or uid of collaborator")
+    updated = firebase_service.add_collaborator(task_id, current_user["uid"], identifier)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Task not found or permission denied")
+    return Task(**updated)
+
+
+@router.delete("/{task_id}/collaborators/{collab_uid}", response_model=Task)
+def remove_collaborator(
+    task_id: str,
+    collab_uid: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    print("Entra - collab_uid:", collab_uid)
+    updated = firebase_service.remove_collaborator(task_id, current_user["uid"], collab_uid)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Task not found or permission denied")
+    return Task(**updated)
