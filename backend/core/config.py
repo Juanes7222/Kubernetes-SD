@@ -2,12 +2,13 @@ import os
 import logging
 from pathlib import Path
 from dotenv import load_dotenv
+from logging_config import get_logger
 
 # Directorio raíz del proyecto
 ROOT_DIR = Path(__file__).parent.parent
 
 # Cargar variables de entorno desde .env
-load_dotenv(ROOT_DIR / ".env")
+load_dotenv(ROOT_DIR / "secrets/.env")
 
 class Settings:
     PROJECT_NAME: str = "ToDo API with Auth"
@@ -31,9 +32,5 @@ class Settings:
 
 settings = Settings()
 
-# Logging global
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
-logger = logging.getLogger(__name__)
+# Logging global (use centralized logger to ensure handlers/format)
+logger = get_logger(__name__)

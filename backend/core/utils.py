@@ -1,8 +1,8 @@
-import logging
+from logging_config import get_logger
 from fastapi import HTTPException
 from datetime import datetime, date
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 def to_firestore_dates(data: dict) -> dict:
     """
