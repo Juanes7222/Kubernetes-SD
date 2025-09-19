@@ -11,7 +11,7 @@ from google.api_core.exceptions import FailedPrecondition
 def initialize_firebase():
     if not firebase_admin._apps:
         # Ruta al archivo de credenciales
-        cred_path = Path(__file__).parent / 'kubernetes-sd.json'
+        cred_path = Path(__file__).parent / 'secrets/kubernetes-sd.json'
         cred = credentials.Certificate(str(cred_path))
         firebase_admin.initialize_app(cred)
     
