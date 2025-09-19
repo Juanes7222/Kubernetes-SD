@@ -15,4 +15,4 @@ RUN rm -rf secrets || true
 
 EXPOSE 8080
 
-CMD ["uvicorn", "backend.services.main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["uvicorn", "services.main:app", "--host", "0.0.0.0", "--port", "8080"]
