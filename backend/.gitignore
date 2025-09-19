@@ -4,8 +4,6 @@
 .idea/
 .vscode/
 
-backend/kubernetes-sd.json
-
 # Environment variables
 .env
 .env.local
@@ -260,4 +258,6 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Secrets
 secrets/
