@@ -4,7 +4,6 @@ from firebase_admin import credentials, firestore, auth
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 from fastapi import HTTPException
-from pathlib import Path
 from core.utils import to_firestore_dates, get_path_credentials
 from core.logging_config import get_logger
 
