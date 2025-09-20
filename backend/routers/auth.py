@@ -3,7 +3,7 @@ from core.auth_middleware import get_current_user
 from services.firebase_service import firebase_auth_service
 from models.schemas import User
 from typing import Dict, Any
-from logging_config import get_logger
+from core.logging_config import get_logger
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
