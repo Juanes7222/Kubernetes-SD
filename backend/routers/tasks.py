@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from core.auth_middleware import get_current_user
 from services.firebase_service import firebase_service
-from models.schemas import Task, TaskCreate, TaskUpdate, CollaboratorIn
+from models.schemas import Task, TaskCreate, TaskUpdate, CollaboratorIn, AssignTaskRequest
 from typing import List, Dict, Any, Optional
 from core.logging_config import get_logger, write
 
@@ -23,20 +23,21 @@ def create_task(
 
 @router.get("", response_model=List[Task])
 def get_tasks(
-    filter_by: Optional[str] = None, # owned / collaborator
+    filter_by: Optional[str] = None, # owned / collaborator / assigned
     search: Optional[str] = None,
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
-    all_tasks = firebase_service.get_tasks(current_user["uid"], search)
     if filter_by == "owned":
-        tasks = [task for task in all_tasks if task.get("owner", {}).get("uid") == current_user["uid"]]
+        all_tasks = firebase_service.get_tasks(current_user["uid"], search, only_owned=True)
     elif filter_by == "collaborator":
-        tasks = [task for task in all_tasks if current_user["uid"] in [collab.get("uid") for collab in task.get("collaborators", [])]]
+        all_tasks = firebase_service.get_tasks(current_user["uid"], search, only_collab=True)
+    elif filter_by == "assigned":
+        all_tasks = firebase_service.get_tasks(current_user["uid"], search, only_assigned=True)
     else:
-        tasks = all_tasks
+        all_tasks = firebase_service.get_tasks(current_user["uid"], search)
 
-    write("info", "get_tasks", name=__name__, user=current_user.get("email") or current_user.get("uid"), count=len(tasks))
-    return [Task(**task) for task in tasks]
+    write("info", "get_tasks", name=__name__, user=current_user.get("email") or current_user.get("uid"), count=len(all_tasks), filter=filter_by)
+    return [Task(**task) for task in all_tasks]
 
 
 @router.get("/{task_id}", response_model=Task)
@@ -118,4 +119,35 @@ def remove_collaborator(
     if not updated:
         raise HTTPException(status_code=404, detail="Task not found or permission denied")
     write("info", "remove_collaborator", name=__name__, user=current_user.get("email") or current_user.get("uid"), task_id=task_id, removed=collab_uid)
+    return Task(**updated)
+
+
+@router.post("/{task_id}/assign", response_model=Task)
+def assign_task(
+    task_id: str,
+    payload: AssignTaskRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    identifier = payload.assignee_email if payload.assignee_email else payload.assignee_uid
+    if not identifier:
+        raise HTTPException(status_code=400, detail="Provide assignee_email or assignee_uid")
+    
+    updated = firebase_service.assign_task(task_id, identifier, current_user["uid"])
+    if not updated:
+        raise HTTPException(status_code=404, detail="Task not found or permission denied")
+    
+    write("info", "assign_task", name=__name__, user=current_user.get("email") or current_user.get("uid"), task_id=task_id, assigned_to=identifier)
+    return Task(**updated)
+
+
+@router.delete("/{task_id}/assign", response_model=Task)
+def unassign_task(
+    task_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    updated = firebase_service.unassign_task(task_id, current_user["uid"])
+    if not updated:
+        raise HTTPException(status_code=404, detail="Task not found or permission denied")
+    
+    write("info", "unassign_task", name=__name__, user=current_user.get("email") or current_user.get("uid"), task_id=task_id)
     return Task(**updated)
