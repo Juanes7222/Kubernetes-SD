@@ -67,11 +67,14 @@ const TodoApp = () => {
   const { user, logout, getIdToken } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [taskFilter, setTaskFilter] = useState("all"); // all, owned, collaborator, assigned
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [loading, setLoading] = useState(true);
   const [shareTask, setShareTask] = useState(null);
   const [shareUid, setShareUid] = useState("");
+  const [assignTask, setAssignTask] = useState(null);
+  const [assigneeInput, setAssigneeInput] = useState("");
 
   // Form states
   const [formData, setFormData] = useState({
@@ -95,9 +98,12 @@ const TodoApp = () => {
   }, [user, getIdToken]);
 
   // Fetch tasks
-  const fetchTasks = async (search = "") => {
+  const fetchTasks = async (search = "", filter = taskFilter) => {
     try {
-      const params = search ? { search } : {};
+      const params = {};
+      if (search) params.search = search;
+      if (filter !== "all") params.filter_by = filter;
+      
       const response = await axios.get(`${API}/tasks`, { params });
       setTasks(response.data);
     } catch (error) {
@@ -262,6 +268,42 @@ const TodoApp = () => {
     }
   };
 
+  // Assign task
+  const assignTaskToUser = async () => {
+    if (!assigneeInput.trim()) return;
+    
+    try {
+      const resp = await axios.post(
+        `${API}/tasks/${assignTask.id}/assign`,
+        {
+          assignee_email: assigneeInput.includes("@") ? assigneeInput : null,
+          assignee_uid: !assigneeInput.includes("@") ? assigneeInput : null,
+        }
+      );
+      setTasks((prev) =>
+        prev.map((t) => (t.id === assignTask.id ? resp.data : t))
+      );
+      setAssignTask(null);
+      setAssigneeInput("");
+      fetchTasks(searchQuery, taskFilter);
+    } catch (error) {
+      console.error("Error assigning task:", error);
+    }
+  };
+
+  // Unassign task
+  const unassignTask = async (taskId) => {
+    try {
+      const resp = await axios.delete(`${API}/tasks/${taskId}/assign`);
+      setTasks((prev) =>
+        prev.map((t) => (t.id === taskId ? resp.data : t))
+      );
+      fetchTasks(searchQuery, taskFilter);
+    } catch (error) {
+      console.error("Error unassigning task:", error);
+    }
+  };
+
   // Format date for display
   const formatDate = (dateString) => {
     if (!dateString) return null;
@@ -299,18 +341,18 @@ const TodoApp = () => {
     if (user) {
       fetchTasks();
     }
-  }, [user]);
+  }, [user, taskFilter]);
 
   // Search functionality
   useEffect(() => {
     if (user) {
       const timeoutId = setTimeout(() => {
-        fetchTasks(searchQuery);
+        fetchTasks(searchQuery, taskFilter);
       }, 500);
 
       return () => clearTimeout(timeoutId);
     }
-  }, [searchQuery, user]);
+  }, [searchQuery, user, taskFilter]);
 
   if (loading) {
     return (
@@ -364,6 +406,38 @@ const TodoApp = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 bg-white border-gray-200"
               />
+            </div>
+
+            {/* Filtros de tareas */}
+            <div className="flex gap-2">
+              <Button
+                variant={taskFilter === "all" ? "default" : "outline"}
+                onClick={() => setTaskFilter("all")}
+                size="sm"
+              >
+                Todas
+              </Button>
+              <Button
+                variant={taskFilter === "owned" ? "default" : "outline"}
+                onClick={() => setTaskFilter("owned")}
+                size="sm"
+              >
+                Propias
+              </Button>
+              <Button
+                variant={taskFilter === "collaborator" ? "default" : "outline"}
+                onClick={() => setTaskFilter("collaborator")}
+                size="sm"
+              >
+                Colaboración
+              </Button>
+              <Button
+                variant={taskFilter === "assigned" ? "default" : "outline"}
+                onClick={() => setTaskFilter("assigned")}
+                size="sm"
+              >
+                Asignadas
+              </Button>
             </div>
 
             <Dialog
@@ -593,6 +667,27 @@ const TodoApp = () => {
                               Completada
                             </Badge>
                           )}
+
+                          {/* Mostrar si la tarea fue compartida contigo */}
+                          {task.invited_by && (
+                            <Badge
+                              variant="outline"
+                              className="text-xs border-purple-200 text-purple-700 bg-purple-50"
+                            >
+                              Compartida por {task.invited_by.invited_by_name || task.invited_by.invited_by_email}
+                            </Badge>
+                          )}
+
+                          {/* Mostrar responsable asignado */}
+                          {task.assignee && (
+                            <Badge
+                              variant="outline"
+                              className="text-xs border-blue-200 text-blue-700 bg-blue-50"
+                            >
+                              <User className="h-3 w-3 mr-1" />
+                              Asignada a {task.assignee.display_name || task.assignee.email}
+                            </Badge>
+                          )}
                         </div>
                       </div>
 
@@ -612,6 +707,15 @@ const TodoApp = () => {
                           className="text-gray-400 hover:text-red-600"
                         >
                           <Trash2 className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setAssignTask(task)}
+                          className="text-gray-400 hover:text-blue-600"
+                          title="Asignar responsable"
+                        >
+                          <User className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
@@ -648,16 +752,76 @@ const TodoApp = () => {
             <DialogTitle>Compartir tarea</DialogTitle>
           </DialogHeader>
           {shareTask && (
-            <div className="space-y-4">
-              <div>
+            <div className="space-y-6">
+              {/* Información de la tarea */}
+              <div className="pb-4 border-b">
                 <div className="text-sm font-medium">{shareTask.title}</div>
-                <div className="text-xs text-gray-500">
-                  {shareTask.description}
+                {shareTask.description && (
+                  <div className="text-xs text-gray-500 mt-1">
+                    {shareTask.description}
+                  </div>
+                )}
+                {shareTask.due_date && (
+                  <div className="text-xs text-gray-400 mt-1">
+                    Vence: {formatDate(shareTask.due_date)}
+                  </div>
+                )}
+              </div>
+
+              {/* Información del creador */}
+              <div>
+                <div className="text-sm font-medium mb-2 text-blue-700">Creador de la tarea</div>
+                <div className="border rounded p-3 bg-blue-50">
+                  <div className="text-sm">
+                    <div className="font-medium flex items-center gap-2">
+                      <User className="h-4 w-4 text-blue-600" />
+                      {shareTask.owner?.display_name || 
+                       shareTask.owner?.email || 
+                       shareTask.owner?.uid || 
+                       'Usuario desconocido'}
+                    </div>
+                    {shareTask.owner?.email && (
+                      <div className="text-xs text-gray-600 mt-1">
+                        {shareTask.owner.email}
+                      </div>
+                    )}
+                    <div className="text-xs text-blue-600 mt-1 font-medium">
+                      Propietario
+                    </div>
+                  </div>
                 </div>
               </div>
 
+              {/* Información de quién te agregó como colaborador */}
+              {shareTask.invited_by && (
+                <div>
+                  <div className="text-sm font-medium mb-2 text-green-700">Te agregó como colaborador</div>
+                  <div className="border rounded p-3 bg-green-50">
+                    <div className="text-sm">
+                      <div className="font-medium flex items-center gap-2">
+                        <User className="h-4 w-4 text-green-600" />
+                        {shareTask.invited_by.invited_by_name || 
+                         shareTask.invited_by.invited_by_email || 
+                         'Usuario desconocido'}
+                      </div>
+                      {shareTask.invited_by.invited_by_email && (
+                        <div className="text-xs text-gray-600 mt-1">
+                          {shareTask.invited_by.invited_by_email}
+                        </div>
+                      )}
+                      {shareTask.invited_by.invited_at && (
+                        <div className="text-xs text-green-600 mt-1">
+                          Invitado el: {new Date(shareTask.invited_by.invited_at).toLocaleDateString()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Añadir colaborador */}
               <div>
-                <label className="block text-xs text-gray-600 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Añadir colaborador por correo electrónico
                 </label>
                 <div className="flex gap-2">
@@ -665,29 +829,31 @@ const TodoApp = () => {
                     value={shareUid}
                     onChange={(e) => setShareUid(e.target.value)}
                     placeholder="correo@ejemplo.com"
+                    className="border-gray-200"
                   />
                   <Button
                     onClick={addCollaborator}
-                    className="bg-gray-900 text-white"
+                    className="bg-gray-900 text-white hover:bg-gray-800"
                   >
                     Invitar
                   </Button>
                 </div>
               </div>
 
+              {/* Lista de colaboradores */}
               <div>
                 <div className="text-sm font-medium mb-2">Colaboradores</div>
                 {!shareTask.collaborators ||
                 shareTask.collaborators.length === 0 ? (
-                  <div className="text-xs text-gray-500">
-                    No hay colaboradores
+                  <div className="text-xs text-gray-500 p-3 border rounded bg-gray-50">
+                    No hay colaboradores añadidos
                   </div>
                 ) : (
                   <div className="flex flex-col gap-2">
                     {shareTask.collaborators.map((c) => (
                       <div
                         key={c.uid}
-                        className="flex items-center justify-between gap-2 border rounded p-2"
+                        className="flex items-center justify-between gap-2 border rounded p-3 bg-white"
                       >
                         <div className="text-sm">
                           <div className="font-medium">
@@ -701,6 +867,7 @@ const TodoApp = () => {
                           variant="ghost"
                           size="sm"
                           onClick={() => removeCollaborator(c.uid)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
                         >
                           Eliminar
                         </Button>
@@ -710,9 +877,69 @@ const TodoApp = () => {
                 )}
               </div>
 
-              <div className="flex justify-end">
+              {/* Botones de acción */}
+              <div className="flex justify-end pt-4 border-t">
                 <Button variant="outline" onClick={closeShareDialog}>
                   Cerrar
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Diálogo de asignación */}
+      <Dialog open={!!assignTask} onOpenChange={() => setAssignTask(null)}>
+        <DialogContent className="bg-white">
+          <DialogHeader>
+            <DialogTitle>Asignar Responsable</DialogTitle>
+          </DialogHeader>
+          {assignTask && (
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-gray-600 mb-2">
+                  Tarea: <span className="font-medium">{assignTask.title}</span>
+                </p>
+                
+                {assignTask.assignee && (
+                  <div className="mb-4 p-3 bg-blue-50 rounded-lg">
+                    <p className="text-sm text-blue-800">
+                      <strong>Responsable actual:</strong> {assignTask.assignee.display_name || assignTask.assignee.email}
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => unassignTask(assignTask.id)}
+                      className="mt-2"
+                    >
+                      Desasignar
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Email o UID del responsable
+                </label>
+                <Input
+                  type="text"
+                  value={assigneeInput}
+                  onChange={(e) => setAssigneeInput(e.target.value)}
+                  placeholder="correo@ejemplo.com"
+                  className="w-full"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-4 border-t">
+                <Button variant="outline" onClick={() => setAssignTask(null)}>
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={assignTaskToUser}
+                  disabled={!assigneeInput.trim()}
+                >
+                  Asignar
                 </Button>
               </div>
             </div>
