@@ -130,31 +130,12 @@ class FirebaseTaskService:
         }
         return task
     
-    def _enrich_assignee(self, task: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Add basic information about the assigned person of the task
-        """
-        assigned_to = task.get("assigned_to")
-        
-        if isinstance(assigned_to, str) and assigned_to:
-            assignee_info = FirebaseAuthService.get_user_by_uid(assigned_to)
-        else:
-            assignee_info = None
-        
-        task["assignee"] = {
-            "uid": assignee_info.get("uid") if assignee_info else assigned_to,
-            "email": assignee_info.get("email") if assignee_info else None,
-            "display_name": assignee_info.get("display_name") if assignee_info else None,
-        } if assigned_to else None
-        return task
-    
     def _enrich_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
         """
         Enriches collaborators, owner and assignee
         """
         task = self._enrich_collaborators(task)
         task = self._enrich_owner(task)
-        task = self._enrich_assignee(task)
         return task
     
     def _enrich_task_for_user(self, task: Dict[str, Any], user_id: str) -> Dict[str, Any]:
@@ -190,55 +171,37 @@ class FirebaseTaskService:
                   search: Optional[str] = None,
                   only_owned: bool = False,
                   only_collab: bool = False,
-                  only_assigned: bool = False
                 ) -> List[Dict[str, Any]]:
         """
         Get tasks filtered by ownership/collaboration/assignment.
         - only_owned = True -> only tasks where user is owner
         - only_collab = True -> only tasks where user is a collaborator
-        - only_assigned = True -> only tasks assigned to user
         - default -> all (owned + collaborative + assigned)
         """
         try:
             docs = []
-            logger.info(f"get_tasks: Getting tasks for user_id={user_id}, only_owned={only_owned}, only_collab={only_collab}, only_assigned={only_assigned}")
+            logger.info(f"get_tasks: Getting tasks for user_id={user_id}, only_owned={only_owned}, only_collab={only_collab}")
             
             # Si se especifica solo un tipo específico, consultar solo eso
-            if only_owned:
-                logger.info(f"get_tasks: Querying ONLY owned tasks for {user_id}")
+            if not only_collab:
+                logger.info(f"get_tasks: Querying owned tasks for {user_id}")
                 owned_docs = list(self.collection.where("owner_id", "==", user_id).stream())
                 logger.info(f"get_tasks: Found {len(owned_docs)} owned tasks")
-                docs = owned_docs
-            elif only_collab:
-                logger.info(f"get_tasks: Querying ONLY collaborative tasks for {user_id}")
+                docs += owned_docs
+                    
+            if not only_owned:
+                logger.info(f"get_tasks: Querying collaborative tasks for {user_id}")
                 collab_docs = list(self.collection.where("collaborators", "array_contains", user_id).stream())
                 logger.info(f"get_tasks: Found {len(collab_docs)} collaborative tasks")
-                docs = collab_docs
-            elif only_assigned:
-                logger.info(f"get_tasks: Querying ONLY assigned tasks for {user_id}")
+                docs += collab_docs
+            
+            # No se especifica el tipo. Opción predeterminada
+            if not only_owned and not only_collab:
+                logger.info(f"get_tasks: Querying assigned tasks for {user_id}")
                 assigned_docs = list(self.collection.where("assigned_to", "==", user_id).stream())
                 logger.info(f"get_tasks: Found {len(assigned_docs)} assigned tasks")
-                docs = assigned_docs
-            else:
-                # Consultar todos los tipos (comportamiento por defecto)
-                if not only_collab and not only_assigned:
-                    logger.info(f"get_tasks: Querying owned tasks for {user_id}")
-                    owned_docs = list(self.collection.where("owner_id", "==", user_id).stream())
-                    logger.info(f"get_tasks: Found {len(owned_docs)} owned tasks")
-                    docs += owned_docs
-                    
-                if not only_owned and not only_assigned:
-                    logger.info(f"get_tasks: Querying collaborative tasks for {user_id}")
-                    collab_docs = list(self.collection.where("collaborators", "array_contains", user_id).stream())
-                    logger.info(f"get_tasks: Found {len(collab_docs)} collaborative tasks")
-                    docs += collab_docs
-                    
-                if not only_owned and not only_collab:
-                    logger.info(f"get_tasks: Querying assigned tasks for {user_id}")
-                    assigned_docs = list(self.collection.where("assigned_to", "==", user_id).stream())
-                    logger.info(f"get_tasks: Found {len(assigned_docs)} assigned tasks")
-                    docs += assigned_docs
-                
+                docs += assigned_docs
+
         except Exception as e:
             logger.error(f"get_tasks: Error querying tasks: {e}")
             raise HTTPException(status_code=500, detail="Error querying tasks")

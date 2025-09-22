@@ -29,17 +29,16 @@ def get_tasks(
 ):
     logger.info(f"get_tasks called with filter_by={filter_by}, search={search}, user={current_user.get('email')}")
     
+    all_tasks = firebase_service.get_tasks(current_user["uid"], search)
     if filter_by == "owned":
-        all_tasks = firebase_service.get_tasks(current_user["uid"], search, only_owned=True)
+        tasks = [task for task in all_tasks if task.get("owner", {}).get("uid") == current_user["uid"]]
     elif filter_by == "collaborator":
-        all_tasks = firebase_service.get_tasks(current_user["uid"], search, only_collab=True)
-    elif filter_by == "assigned":
-        all_tasks = firebase_service.get_tasks(current_user["uid"], search, only_assigned=True)
+        tasks = [task for task in all_tasks if current_user["uid"] in [collab.get("uid") for collab in task.get("collaborators", [])]]
     else:
-        all_tasks = firebase_service.get_tasks(current_user["uid"], search)
+        tasks = all_tasks
 
-    write("info", "get_tasks", name=__name__, user=current_user.get("email") or current_user.get("uid"), count=len(all_tasks), filter=filter_by)
-    return [Task(**task) for task in all_tasks]
+    write("info", "get_tasks", name=__name__, user=current_user.get("email") or current_user.get("uid"), count=len(tasks))
+    return [Task(**task) for task in tasks]
 
 
 @router.get("/debug", response_model=Dict[str, Any])
@@ -52,7 +51,6 @@ def debug_tasks(
     # Get all task types separately
     owned_tasks = firebase_service.get_tasks(user_id, only_owned=True)
     collab_tasks = firebase_service.get_tasks(user_id, only_collab=True)
-    assigned_tasks = firebase_service.get_tasks(user_id, only_assigned=True)
     all_tasks = firebase_service.get_tasks(user_id)
     
     return {
@@ -62,8 +60,6 @@ def debug_tasks(
         "owned_tasks": [{"id": t.get("id"), "title": t.get("title"), "owner_id": t.get("owner_id")} for t in owned_tasks],
         "collab_count": len(collab_tasks),
         "collab_tasks": [{"id": t.get("id"), "title": t.get("title"), "collaborators": t.get("collaborators")} for t in collab_tasks],
-        "assigned_count": len(assigned_tasks),
-        "assigned_tasks": [{"id": t.get("id"), "title": t.get("title"), "assigned_to": t.get("assigned_to")} for t in assigned_tasks],
         "all_count": len(all_tasks),
         "all_tasks": [{"id": t.get("id"), "title": t.get("title"), "owner_id": t.get("owner_id"), "assigned_to": t.get("assigned_to"), "collaborators": len(t.get("collaborators", []))} for t in all_tasks]
     }
