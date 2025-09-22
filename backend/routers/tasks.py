@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from core.auth_middleware import get_current_user
 from services.firebase_service import firebase_service
-from models.schemas import Task, TaskCreate, TaskUpdate, CollaboratorIn, AssignTaskRequest
+from models.schemas import Task, TaskCreate, TaskUpdate, CollaboratorIn
 from typing import List, Dict, Any, Optional
 from core.logging_config import get_logger, write
 
@@ -148,35 +148,4 @@ def remove_collaborator(
     if not updated:
         raise HTTPException(status_code=404, detail="Task not found or permission denied")
     write("info", "remove_collaborator", name=__name__, user=current_user.get("email") or current_user.get("uid"), task_id=task_id, removed=collab_uid)
-    return Task(**updated)
-
-
-@router.post("/{task_id}/assign", response_model=Task)
-def assign_task(
-    task_id: str,
-    payload: AssignTaskRequest,
-    current_user: Dict[str, Any] = Depends(get_current_user)
-):
-    identifier = payload.assignee_email if payload.assignee_email else payload.assignee_uid
-    if not identifier:
-        raise HTTPException(status_code=400, detail="Provide assignee_email or assignee_uid")
-    
-    updated = firebase_service.assign_task(task_id, identifier, current_user["uid"])
-    if not updated:
-        raise HTTPException(status_code=404, detail="Task not found or permission denied")
-    
-    write("info", "assign_task", name=__name__, user=current_user.get("email") or current_user.get("uid"), task_id=task_id, assigned_to=identifier)
-    return Task(**updated)
-
-
-@router.delete("/{task_id}/assign", response_model=Task)
-def unassign_task(
-    task_id: str,
-    current_user: Dict[str, Any] = Depends(get_current_user)
-):
-    updated = firebase_service.unassign_task(task_id, current_user["uid"])
-    if not updated:
-        raise HTTPException(status_code=404, detail="Task not found or permission denied")
-    
-    write("info", "unassign_task", name=__name__, user=current_user.get("email") or current_user.get("uid"), task_id=task_id)
     return Task(**updated)
