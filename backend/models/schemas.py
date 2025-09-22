@@ -46,4 +46,3 @@ class TaskUpdate(BaseModel):
     description: Optional[str] = None
     due_date: Optional[date] = None
     completed: Optional[bool] = None
-    assigned_to: Optional[str] = None

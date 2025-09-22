@@ -48,18 +48,12 @@ def debug_tasks(
     """Debug endpoint to see raw task data"""
     user_id = current_user["uid"]
     
-    # Get all task types separately
-    owned_tasks = firebase_service.get_tasks(user_id, only_owned=True)
-    collab_tasks = firebase_service.get_tasks(user_id, only_collab=True)
+    # Get all task
     all_tasks = firebase_service.get_tasks(user_id)
     
     return {
         "user_id": user_id,
         "user_email": current_user.get("email"),
-        "owned_count": len(owned_tasks),
-        "owned_tasks": [{"id": t.get("id"), "title": t.get("title"), "owner_id": t.get("owner_id")} for t in owned_tasks],
-        "collab_count": len(collab_tasks),
-        "collab_tasks": [{"id": t.get("id"), "title": t.get("title"), "collaborators": t.get("collaborators")} for t in collab_tasks],
         "all_count": len(all_tasks),
         "all_tasks": [{"id": t.get("id"), "title": t.get("title"), "owner_id": t.get("owner_id"), "collaborators": len(t.get("collaborators", []))} for t in all_tasks]
     }
