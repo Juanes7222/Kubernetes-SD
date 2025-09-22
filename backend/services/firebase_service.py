@@ -370,6 +370,11 @@ class FirebaseTaskService:
                 # Usuario no existe
                 return None
             collaborator_uid = user_info['uid']
+        else:
+            # Validar que el UID exista
+            user_info = FirebaseAuthService.get_user_by_uid(collaborator_uid)
+            if not user_info:
+                return None
         
         if collaborator_uid not in collaborators:
             collaborators.append(collaborator_uid)
