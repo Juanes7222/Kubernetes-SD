@@ -666,7 +666,7 @@ const TodoApp = () => {
                             </Badge>
                           )}
 
-                          {/* Mostrar responsable asignado */}
+                          {/* Mostrar responsable asignado 
                           {task.assignee && (
                             <Badge
                               variant="outline"
@@ -675,7 +675,7 @@ const TodoApp = () => {
                               <User className="h-3 w-3 mr-1" />
                               Asignada a {task.assignee.display_name || task.assignee.email}
                             </Badge>
-                          )}
+                          )*/}
                         </div>
                       </div>
 
@@ -688,6 +688,10 @@ const TodoApp = () => {
                         >
                           <Edit3 className="h-4 w-4" />
                         </Button>
+                        {/* Mostrar botones de editar y eliminar solo para el propietario */}
+                    {(task.owner?.uid === user?.uid || task.owner?.email === user?.email) && (
+                      <>
+                        
                         <Button
                           variant="ghost"
                           size="sm"
@@ -696,17 +700,27 @@ const TodoApp = () => {
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
-                        
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openShareDialog(task)}
-                          className="text-gray-400 hover:text-gray-600"
-                          title="Compartir"
-                        >
-                          <User className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      </>
+                    )}
+                    {/* Mostrar botones de asignar y compartir para el propietario y colaboradores con permiso */}
+                      {(task.owner?.uid === user?.uid || 
+                        task.owner?.email === user?.email || 
+                        task.collaborators?.some(collab => 
+                          collab.uid === user?.uid || collab.email === user?.email
+                        )) && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openShareDialog(task)}
+                            className="text-gray-400 hover:text-gray-600"
+                            title="Compartir"
+                          >
+                            <User className="h-4 w-4" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
                     </div>
                   </CardContent>
                 </Card>
