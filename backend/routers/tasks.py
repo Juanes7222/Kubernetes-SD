@@ -23,7 +23,7 @@ def create_task(
 
 @router.get("", response_model=List[Task])
 def get_tasks(
-    filter_by: Optional[str] = None, # owned / collaborator / assigned
+    filter_by: Optional[str] = None, # owned / collaborator
     search: Optional[str] = None,
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
@@ -61,7 +61,7 @@ def debug_tasks(
         "collab_count": len(collab_tasks),
         "collab_tasks": [{"id": t.get("id"), "title": t.get("title"), "collaborators": t.get("collaborators")} for t in collab_tasks],
         "all_count": len(all_tasks),
-        "all_tasks": [{"id": t.get("id"), "title": t.get("title"), "owner_id": t.get("owner_id"), "assigned_to": t.get("assigned_to"), "collaborators": len(t.get("collaborators", []))} for t in all_tasks]
+        "all_tasks": [{"id": t.get("id"), "title": t.get("title"), "owner_id": t.get("owner_id"), "collaborators": len(t.get("collaborators", []))} for t in all_tasks]
     }
 
 
