@@ -27,6 +27,8 @@ def get_tasks(
     search: Optional[str] = None,
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
+    logger.info(f"get_tasks called with filter_by={filter_by}, search={search}, user={current_user.get('email')}")
+    
     if filter_by == "owned":
         all_tasks = firebase_service.get_tasks(current_user["uid"], search, only_owned=True)
     elif filter_by == "collaborator":
@@ -38,6 +40,33 @@ def get_tasks(
 
     write("info", "get_tasks", name=__name__, user=current_user.get("email") or current_user.get("uid"), count=len(all_tasks), filter=filter_by)
     return [Task(**task) for task in all_tasks]
+
+
+@router.get("/debug", response_model=Dict[str, Any])
+def debug_tasks(
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Debug endpoint to see raw task data"""
+    user_id = current_user["uid"]
+    
+    # Get all task types separately
+    owned_tasks = firebase_service.get_tasks(user_id, only_owned=True)
+    collab_tasks = firebase_service.get_tasks(user_id, only_collab=True)
+    assigned_tasks = firebase_service.get_tasks(user_id, only_assigned=True)
+    all_tasks = firebase_service.get_tasks(user_id)
+    
+    return {
+        "user_id": user_id,
+        "user_email": current_user.get("email"),
+        "owned_count": len(owned_tasks),
+        "owned_tasks": [{"id": t.get("id"), "title": t.get("title"), "owner_id": t.get("owner_id")} for t in owned_tasks],
+        "collab_count": len(collab_tasks),
+        "collab_tasks": [{"id": t.get("id"), "title": t.get("title"), "collaborators": t.get("collaborators")} for t in collab_tasks],
+        "assigned_count": len(assigned_tasks),
+        "assigned_tasks": [{"id": t.get("id"), "title": t.get("title"), "assigned_to": t.get("assigned_to")} for t in assigned_tasks],
+        "all_count": len(all_tasks),
+        "all_tasks": [{"id": t.get("id"), "title": t.get("title"), "owner_id": t.get("owner_id"), "assigned_to": t.get("assigned_to"), "collaborators": len(t.get("collaborators", []))} for t in all_tasks]
+    }
 
 
 @router.get("/{task_id}", response_model=Task)
