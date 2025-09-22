@@ -132,7 +132,7 @@ class FirebaseTaskService:
     
     def _enrich_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Enriches collaborators, owner and assignee
+        Enriches collaborators, owner
         """
         task = self._enrich_collaborators(task)
         task = self._enrich_owner(task)
@@ -170,34 +170,23 @@ class FirebaseTaskService:
         self,
         user_id: str,
         search: Optional[str] = None,
-        only_owned: bool = False,
-        only_collab: bool = False,
     ) -> List[Dict[str, Any]]:
         """
-        Get tasks filtered by ownership/collaboration/assignment.
-        - only_owned = True -> only tasks where user is owner
-        - only_collab = True -> only tasks where user is a collaborator
-        - default -> all (owned + collaborative)
+        Get all tasks for a user (owned + collaborative).
         """
         try:
             docs = []
-            logger.info(
-                f"get_tasks: Getting tasks for user_id={user_id}, "
-                f"only_owned={only_owned}, only_collab={only_collab}"
-            )
+            logger.info(f"get_tasks: Getting tasks for user_id={user_id}")
 
-            queries = []
-            # Si el router pedirá todas, traemos owned + collaborator en paralelo
-            if not only_collab:
-                queries.append(("owned", self.collection.where("owner_id", "==", user_id)))
-            if not only_owned:
-                queries.append(("collab", self.collection.where("collaborators", "array_contains", user_id)))
+            # Owned tasks
+            owned_docs = list(self.collection.where("owner_id", "==", user_id).stream())
+            logger.info(f"get_tasks: Found {len(owned_docs)} owned tasks")
+            docs.extend(owned_docs)
 
-            # Ejecutar las queries
-            for qtype, query in queries:
-                found_docs = list(query.stream())
-                logger.info(f"get_tasks: Found {len(found_docs)} {qtype} tasks for {user_id}")
-                docs.extend(found_docs)
+            # Collaborative tasks
+            collab_docs = list(self.collection.where("collaborators", "array_contains", user_id).stream())
+            logger.info(f"get_tasks: Found {len(collab_docs)} collaborative tasks")
+            docs.extend(collab_docs)
 
         except Exception as e:
             logger.error(f"get_tasks: Error querying tasks: {e}")
@@ -218,15 +207,20 @@ class FirebaseTaskService:
                 continue
             seen_ids.add(task["id"])
 
-            # Aplicar búsqueda si corresponde
+            # Filtro de búsqueda si corresponde
             if search_lower:
-                if not (search_lower in task.get("title", "").lower() or search_lower in task.get("description", "").lower()):
+                if not (
+                    search_lower in task.get("title", "").lower()
+                    or search_lower in task.get("description", "").lower()
+                ):
                     continue
 
             tasks.append(self._enrich_task_for_user(task, user_id))
 
         logger.info(f"get_tasks: returning {len(tasks)} tasks after deduplication for user {user_id}")
-        tasks.sort(key=lambda t: t.get("created_at") or datetime.fromtimestamp(0, tz=timezone.utc), reverse=True,
+        tasks.sort(
+            key=lambda t: t.get("created_at") or datetime.fromtimestamp(0, tz=timezone.utc),
+            reverse=True,
         )
         return tasks
     
