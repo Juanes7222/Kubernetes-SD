@@ -73,8 +73,7 @@ const TodoApp = () => {
   const [loading, setLoading] = useState(true);
   const [shareTask, setShareTask] = useState(null);
   const [shareUid, setShareUid] = useState("");
-  const [assignTask, setAssignTask] = useState(null);
-  const [assigneeInput, setAssigneeInput] = useState("");
+  
 
   // Form states
   const [formData, setFormData] = useState({
@@ -105,7 +104,38 @@ const TodoApp = () => {
       if (filter !== "all") params.filter_by = filter;
       
       const response = await axios.get(`${API}/tasks`, { params });
-      setTasks(response.data);
+      const tasksData = response.data || [];
+
+      // Enrich owners: if task.owner is missing but owner_id present, resolve via backend
+      const ownerCache = {};
+      const ownersToFetch = new Set();
+      tasksData.forEach((t) => {
+        if ((!t.owner || !t.owner.email) && t.owner_id) {
+          ownersToFetch.add(t.owner_id);
+        }
+      });
+
+      // Fetch owners in parallel
+      const ownerFetchPromises = Array.from(ownersToFetch).map((uid) =>
+        axios
+          .get(`${API}/auth/users/${encodeURIComponent(uid)}`)
+          .then((r) => ({ uid, info: r.data }))
+          .catch(() => ({ uid, info: null }))
+      );
+
+      const ownerResults = await Promise.all(ownerFetchPromises);
+      ownerResults.forEach(({ uid, info }) => {
+        if (info) ownerCache[uid] = info;
+      });
+
+      const enriched = tasksData.map((t) => {
+        if ((!t.owner || !t.owner.email) && t.owner_id && ownerCache[t.owner_id]) {
+          t.owner = ownerCache[t.owner_id];
+        }
+        return t;
+      });
+
+      setTasks(enriched);
     } catch (error) {
       console.error("Error fetching tasks:", error);
       logger.error(
@@ -268,41 +298,6 @@ const TodoApp = () => {
     }
   };
 
-  // Assign task
-  const assignTaskToUser = async () => {
-    if (!assigneeInput.trim()) return;
-    
-    try {
-      const resp = await axios.post(
-        `${API}/tasks/${assignTask.id}/assign`,
-        {
-          assignee_email: assigneeInput.includes("@") ? assigneeInput : null,
-          assignee_uid: !assigneeInput.includes("@") ? assigneeInput : null,
-        }
-      );
-      setTasks((prev) =>
-        prev.map((t) => (t.id === assignTask.id ? resp.data : t))
-      );
-      setAssignTask(null);
-      setAssigneeInput("");
-      fetchTasks(searchQuery, taskFilter);
-    } catch (error) {
-      console.error("Error assigning task:", error);
-    }
-  };
-
-  // Unassign task
-  const unassignTask = async (taskId) => {
-    try {
-      const resp = await axios.delete(`${API}/tasks/${taskId}/assign`);
-      setTasks((prev) =>
-        prev.map((t) => (t.id === taskId ? resp.data : t))
-      );
-      fetchTasks(searchQuery, taskFilter);
-    } catch (error) {
-      console.error("Error unassigning task:", error);
-    }
-  };
 
   // Format date for display
   const formatDate = (dateString) => {
@@ -430,13 +425,6 @@ const TodoApp = () => {
                 size="sm"
               >
                 Colaboración
-              </Button>
-              <Button
-                variant={taskFilter === "assigned" ? "default" : "outline"}
-                onClick={() => setTaskFilter("assigned")}
-                size="sm"
-              >
-                Asignadas
               </Button>
             </div>
 
@@ -708,15 +696,7 @@ const TodoApp = () => {
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setAssignTask(task)}
-                          className="text-gray-400 hover:text-blue-600"
-                          title="Asignar responsable"
-                        >
-                          <User className="h-4 w-4" />
-                        </Button>
+                        
                         <Button
                           variant="ghost"
                           size="sm"
@@ -886,66 +866,7 @@ const TodoApp = () => {
             </div>
           )}
         </DialogContent>
-      </Dialog>
-
-      {/* Diálogo de asignación */}
-      <Dialog open={!!assignTask} onOpenChange={() => setAssignTask(null)}>
-        <DialogContent className="bg-white">
-          <DialogHeader>
-            <DialogTitle>Asignar Responsable</DialogTitle>
-          </DialogHeader>
-          {assignTask && (
-            <div className="space-y-4">
-              <div>
-                <p className="text-sm text-gray-600 mb-2">
-                  Tarea: <span className="font-medium">{assignTask.title}</span>
-                </p>
-                
-                {assignTask.assignee && (
-                  <div className="mb-4 p-3 bg-blue-50 rounded-lg">
-                    <p className="text-sm text-blue-800">
-                      <strong>Responsable actual:</strong> {assignTask.assignee.display_name || assignTask.assignee.email}
-                    </p>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => unassignTask(assignTask.id)}
-                      className="mt-2"
-                    >
-                      Desasignar
-                    </Button>
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Email o UID del responsable
-                </label>
-                <Input
-                  type="text"
-                  value={assigneeInput}
-                  onChange={(e) => setAssigneeInput(e.target.value)}
-                  placeholder="correo@ejemplo.com"
-                  className="w-full"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-4 border-t">
-                <Button variant="outline" onClick={() => setAssignTask(null)}>
-                  Cancelar
-                </Button>
-                <Button
-                  onClick={assignTaskToUser}
-                  disabled={!assigneeInput.trim()}
-                >
-                  Asignar
-                </Button>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
+      </Dialog>      
     </>
   );
 };
