@@ -132,7 +132,7 @@ class FirebaseTaskService:
     
     def _enrich_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Enriches collaborators, owner
+        Enriches collaborators, owner and assignee
         """
         task = self._enrich_collaborators(task)
         task = self._enrich_owner(task)
@@ -174,30 +174,30 @@ class FirebaseTaskService:
         only_collab: bool = False,
     ) -> List[Dict[str, Any]]:
         """
-        Get tasks filtered by ownership/collaboration.
+        Get tasks filtered by ownership/collaboration/assignment.
         - only_owned = True -> only tasks where user is owner
         - only_collab = True -> only tasks where user is a collaborator
-        - default (both False) -> combination of both (owned + collaborative)
+        - default -> all (owned + collaborative)
         """
         try:
             docs = []
             logger.info(
-                f"get_tasks: user_id={user_id}, search={search}, only_owned={only_owned}, only_collab={only_collab}"
+                f"get_tasks: Getting tasks for user_id={user_id}, "
+                f"only_owned={only_owned}, only_collab={only_collab}"
             )
 
+            queries = []
+            # Si el router pedirá todas, traemos owned + collaborator en paralelo
             if not only_collab:
-                # Solo tareas propias
-                logger.info(f"get_tasks: Querying owned tasks for {user_id}")
-                owned_docs = list(self.collection.where("owner_id", "==", user_id).stream())
-                logger.info(f"get_tasks: Found {len(owned_docs)} owned tasks")
-                docs += owned_docs
-
+                queries.append(("owned", self.collection.where("owner_id", "==", user_id)))
             if not only_owned:
-                # Solo tareas donde es colaborador
-                logger.info(f"get_tasks: Querying collaborative tasks for {user_id}")
-                collab_docs = list(self.collection.where("collaborators", "array_contains", user_id).stream())
-                logger.info(f"get_tasks: Found {len(collab_docs)} collaborative tasks")
-                docs += collab_docs
+                queries.append(("collab", self.collection.where("collaborators", "array_contains", user_id)))
+
+            # Ejecutar las queries
+            for qtype, query in queries:
+                found_docs = list(query.stream())
+                logger.info(f"get_tasks: Found {len(found_docs)} {qtype} tasks for {user_id}")
+                docs.extend(found_docs)
 
         except Exception as e:
             logger.error(f"get_tasks: Error querying tasks: {e}")
@@ -205,27 +205,29 @@ class FirebaseTaskService:
 
         tasks = []
         seen_ids = set()
+        search_lower = search.lower() if search else None
+
         for doc in docs:
             task = doc.to_dict()
             if not task:
                 continue
             task["id"] = doc.id
-            
+
             # Evitar duplicados
             if task["id"] in seen_ids:
-                logger.info(f"get_tasks: skipping duplicate task {task['id']}")
                 continue
             seen_ids.add(task["id"])
 
-            if search:
-                search_lower = search.lower()
-                if search_lower in task.get("title", "").lower() or search_lower in task.get("description", "").lower():
-                    tasks.append(self._enrich_task_for_user(task, user_id))
-            else:
-                tasks.append(self._enrich_task_for_user(task, user_id))
+            # Aplicar búsqueda si corresponde
+            if search_lower:
+                if not (search_lower in task.get("title", "").lower() or search_lower in task.get("description", "").lower()):
+                    continue
+
+            tasks.append(self._enrich_task_for_user(task, user_id))
 
         logger.info(f"get_tasks: returning {len(tasks)} tasks after deduplication for user {user_id}")
-        tasks.sort(key=lambda t: t.get("created_at") or datetime.fromtimestamp(0, tz=timezone.utc), reverse=True)
+        tasks.sort(key=lambda t: t.get("created_at") or datetime.fromtimestamp(0, tz=timezone.utc), reverse=True,
+        )
         return tasks
     
     def get_task_by_id(self, task_id: str, user_id: str) -> Optional[Dict[str, Any]]:
