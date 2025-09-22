@@ -666,20 +666,21 @@ const TodoApp = () => {
                             </Badge>
                           )}
 
-                          {/* Mostrar responsable asignado 
-                          {task.assignee && (
+                          {/* Mostrar owner */}
+                          {task.owner && (
                             <Badge
                               variant="outline"
                               className="text-xs border-blue-200 text-blue-700 bg-blue-50"
                             >
                               <User className="h-3 w-3 mr-1" />
-                              Asignada a {task.assignee.display_name || task.assignee.email}
+                              Creada por {task.owner.display_name || task.owner.email}
                             </Badge>
-                          )*/}
+                          )}
                         </div>
                       </div>
 
                       <div className="flex gap-1">
+
                         <Button
                           variant="ghost"
                           size="sm"
@@ -688,9 +689,20 @@ const TodoApp = () => {
                         >
                           <Edit3 className="h-4 w-4" />
                         </Button>
-                        {/* Mostrar botones de editar y eliminar solo para el propietario */}
+                        
+                        {/* Mostrar botones de eliminar y compartir solo para el propietario */}
+
                     {(task.owner?.uid === user?.uid) && (
                       <>
+                       <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openShareDialog(task)}
+                            className="text-gray-400 hover:text-gray-600"
+                            title="Compartir"
+                          >
+                            <User className="h-4 w-4" />
+                          </Button>
                         
                         <Button
                           variant="ghost"
@@ -702,21 +714,15 @@ const TodoApp = () => {
                         </Button>
                       </>
                     )}
-                    {/* Mostrar botones de asignar y compartir para el propietario y colaboradores con permiso */}
+                    {/* Mostrar botones de editar para colaboradores*/}
                       {(task.owner?.uid === user?.uid || 
                         task.collaborators?.some(collab => 
-                          collab.uid === user?.uid || collab.email === user?.email
+                        collab.email === user?.email
                         )) && (
                         <>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openShareDialog(task)}
-                            className="text-gray-400 hover:text-gray-600"
-                            title="Compartir"
-                          >
-                            <User className="h-4 w-4" />
-                          </Button>
+                        
+
+                         
                         </>
                       )}
                     </div>
