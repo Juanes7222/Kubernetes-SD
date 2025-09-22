@@ -29,16 +29,15 @@ def get_tasks(
 ):
     logger.info(f"get_tasks called with filter_by={filter_by}, search={search}, user={current_user.get('email')}")
     
-    all_tasks = firebase_service.get_tasks(current_user["uid"], search)
     if filter_by == "owned":
-        tasks = [task for task in all_tasks if task.get("owner", {}).get("uid") == current_user["uid"]]
+        all_tasks = firebase_service.get_tasks(current_user["uid"], search, only_owned=True)
     elif filter_by == "collaborator":
-        tasks = [task for task in all_tasks if current_user["uid"] in [collab.get("uid") for collab in task.get("collaborators", [])]]
+        all_tasks = firebase_service.get_tasks(current_user["uid"], search, only_collab=True)
     else:
-        tasks = all_tasks
+        all_tasks = firebase_service.get_tasks(current_user["uid"], search)
 
-    write("info", "get_tasks", name=__name__, user=current_user.get("email") or current_user.get("uid"), count=len(tasks))
-    return [Task(**task) for task in tasks]
+    write("info", "get_tasks", name=__name__, user=current_user.get("email") or current_user.get("uid"), count=len(all_tasks), filter=filter_by)
+    return [Task(**task) for task in all_tasks]
 
 
 @router.get("/debug", response_model=Dict[str, Any])
