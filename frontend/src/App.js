@@ -689,7 +689,7 @@ const TodoApp = () => {
                           <Edit3 className="h-4 w-4" />
                         </Button>
                         {/* Mostrar botones de editar y eliminar solo para el propietario */}
-                    {(task.owner?.uid === user?.uid || task.owner?.email === user?.email) && (
+                    {(task.owner?.uid === user?.uid) && (
                       <>
                         
                         <Button
@@ -704,7 +704,6 @@ const TodoApp = () => {
                     )}
                     {/* Mostrar botones de asignar y compartir para el propietario y colaboradores con permiso */}
                       {(task.owner?.uid === user?.uid || 
-                        task.owner?.email === user?.email || 
                         task.collaborators?.some(collab => 
                           collab.uid === user?.uid || collab.email === user?.email
                         )) && (
