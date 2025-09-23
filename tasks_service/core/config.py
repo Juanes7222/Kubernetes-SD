@@ -1,6 +1,9 @@
 from pathlib import Path
+from dotenv import load_dotenv
 import os
 
+# Cargar variables de entorno desde .env
+load_dotenv(Path(__file__).parent.parent / "secrets/.env")
 # Service Info
 SERVICE_NAME = "tasks_service"
 VERSION = "1.0.0"
@@ -30,3 +33,5 @@ LOG_FORMAT = os.getenv(
 
 # Auth Service
 AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth-service:8000")
+COLLABORATOR_SERVICE_URL = os.getenv("COLLABORATOR_SERVICE_URL", "http://collaborator-service:8004")
+LOGS_SERVICE_URL = os.getenv("LOGS_SERVICE_URL", "http://logs-service:8003/client")
