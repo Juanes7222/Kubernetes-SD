@@ -48,7 +48,7 @@ async def add_collaborator(
     
     return result
 
-@router.delete("/{task_id}/{collaborator_id}", response_model=CollaboratorResponse)
+@router.delete("/{task_id}/collaborators/{collaborator_id}", response_model=CollaboratorResponse)
 async def remove_collaborator(
     task_id: str,
     collaborator_id: str,
@@ -57,6 +57,8 @@ async def remove_collaborator(
 ):
     """Delete a collaborator from a task"""
     token = credentials.credentials
+    write("info", f"Token received: {token}")
+    write("info", f"Removing collaborator {collaborator_id} from task {task_id} by user {current_user['uid']}")
     result = collaborator_service.remove_collaborator(
         task_id,
         current_user["uid"],
@@ -78,7 +80,7 @@ async def remove_collaborator(
     
     return result
 
-@router.get("/{task_id}", response_model=CollaboratorResponse)
+@router.get("/{task_id}/collaborators", response_model=CollaboratorResponse)
 async def get_collaborators(
     task_id: str,
     credentials: HTTPAuthorizationCredentials = Depends(security),
