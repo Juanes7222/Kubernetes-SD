@@ -1,21 +1,29 @@
-from fastapi import APIRouter, HTTPException
-from typing import List, Dict, Any
-from core.logging_config import get_logger, write
+from fastapi import APIRouter, Request
+from core.logging_config import client_log, write
 
-logger = get_logger(__name__)
-router = APIRouter(prefix="/logs", tags=["logs"])
+router = APIRouter(tags=["logs"])
 
-# Simulación de logs en memoria
-LOG_STORE: List[Dict[str, Any]] = []
+@router.post("/client")
+async def ingest_client_log(request: Request):
+    """Endpoint centralizado para recibir logs de todos los servicios"""
+    body = await request.json()
+    level = body.get("level", "info").lower()
+    message = body.get("message", "")
+    user = body.get("user")
+    meta = body.get("meta", {})
+    
+    service = meta.get("service", "unknown")
+    logger_name = meta.get("logger_name", "client")
+    
+    # Log centralizado - aquí SÍ se escribe en archivo
+    client_log(level, f"[Service = {service}, logger_name = {logger_name}] {message}", user=user, meta=meta)
+    return {"status": "ok", "received_from": service}
 
-@router.post("", response_model=Dict[str, Any])
-def create_log(payload: Dict[str, Any]):
-    """Agrega un log al sistema (simulado)"""
-    LOG_STORE.append(payload)
-    write("info", "create_log", **payload)
-    return {"message": "Log registrado correctamente"}
-
-@router.get("", response_model=List[Dict[str, Any]])
-def get_logs():
-    """Obtiene todos los logs"""
-    return LOG_STORE
+@router.get("/test")
+async def test_logging():
+    """Test endpoint - solo para el logs_service"""
+    write("debug", "test_logging: debug message")
+    write("info", "test_logging: info message")
+    write("warning", "test_logging: warning message")
+    write("error", "test_logging: error message")
+    return {"status": "ok", "message": "logs emitted from logs_service"}

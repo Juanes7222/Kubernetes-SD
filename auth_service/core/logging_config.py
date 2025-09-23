@@ -1,76 +1,57 @@
 import logging
-from logging.handlers import RotatingFileHandler
-from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Optional, Any
 import httpx
 from core.config import settings
 
-LOG_DIR = Path(__file__).parent / "../logs"
-LOG_DIR.mkdir(parents=True, exist_ok=True)
+# NO hay carpeta logs aquí - solo envío al servicio centralizado
 
 def get_logger(name: str = "auth_service") -> logging.Logger:
+    """Logger mínimo solo para errores críticos del servicio"""
     logger = logging.getLogger(name)
     if logger.handlers:
         return logger
 
-    logger.setLevel(logging.INFO)
+    logger.setLevel(logging.ERROR)  # Solo errores críticos
+    
+    # Solo console handler para errores del servicio mismo
     ch = logging.StreamHandler()
-    ch.setLevel(logging.INFO)
+    ch.setLevel(logging.ERROR)
     formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(name)s - %(message)s")
     ch.setFormatter(formatter)
     logger.addHandler(ch)
 
-    fh = RotatingFileHandler(LOG_DIR / "auth_service.log", maxBytes=5 * 1024 * 1024, backupCount=3, encoding='utf-8')
-    fh.setLevel(logging.INFO)
-    fh.setFormatter(formatter)
-    logger.addHandler(fh)
-
     return logger
 
 async def send_log_to_service(level: str, message: str, name: Optional[str] = None, **meta: Any) -> None:
-    """Send log to logs service"""
+    """Envía TODOS los logs al servicio centralizado"""
     try:
         async with httpx.AsyncClient() as client:
+            payload = {
+                "level": level,
+                "message": message,
+                "meta": {**meta, "service": "auth", "logger_name": name or "auth_service"}
+            }
+            # Agregar user si está en meta
+            if 'user' in meta:
+                payload["user"] = meta['user']
+                
             await client.post(
                 f"{settings.LOGS_SERVICE_URL}/api/logs/client",
-                json={
-                    "level": level,
-                    "message": message,
-                    "meta": {**meta, "service": "auth", "logger_name": name}
-                },
+                json=payload,
                 timeout=5.0
             )
     except Exception as e:
-        # Fallback to local logging if service is unavailable
+        # Fallback: solo log local para errores de conexión al logs_service
         logger = get_logger("logging_fallback")
-        if level == "error":
-            logger.error(f"Failed to send log to service: {e} - {message}")
+        logger.error(f"Failed to send log to service: {e} - Original: {message}")
 
 def write(level: str, message: str, name: Optional[str] = None, **meta: Any) -> None:
-    """Unified write helper that sends to logs service"""
-    logger = get_logger(name or "auth_service")
-    
-    if meta:
-        meta_str = " " + " ".join(f"{k}={v}" for k, v in meta.items())
-    else:
-        meta_str = ""
-
-    msg = f"{message}{meta_str}"
-    lvl = level.lower()
-
-    if lvl == "debug":
-        logger.debug(msg)
-    elif lvl in ("warning", "warn"):
-        logger.warning(msg)
-    elif lvl == "error":
-        logger.error(msg)
-    else:
-        logger.info(msg)
-    
-    # Also send to logs service
+    """Envía log al servicio centralizado"""
+    # Enviar asincrónicamente al servicio de logs
     import asyncio
     asyncio.create_task(send_log_to_service(level, message, name, **meta))
 
 def request_log(method: str, path: str, status: int, time: float, auth: bool = False, name: Optional[str] = None) -> None:
-    """Log HTTP requests"""
-    write("info", f"request {method} {path} status={status} time={time:.3f}s auth={auth}", name=name or "auth_request")
+    """Log HTTP requests - enviado al servicio centralizado"""
+    write("info", f"request {method} {path} status={status} time={time:.3f}s auth={auth}", 
+          name=name or "auth_request")
