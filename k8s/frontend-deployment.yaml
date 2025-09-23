@@ -24,14 +24,15 @@ spec:
         ports:
         - containerPort: 80
         env:
-        - name: REACT_APP_AUTH_URL
-          value: "http://auth-service:8000"
-        - name: REACT_APP_TASKS_URL
-          value: "http://tasks-service:8001"
-        - name: REACT_APP_COLLABORATORS_URL
-          value: "http://collaborator-service:8002"
-        - name: REACT_APP_LOGS_URL
-          value: "http://logs-service:8003"
+        # Use relative URLs so the frontend works with any public domain/IP
+        - name: REACT_APP_AUTH_SERVICE_URL
+          value: ""
+        - name: REACT_APP_TASKS_SERVICE_URL
+          value: ""
+        - name: REACT_APP_COLLABORATOR_SERVICE_URL
+          value: ""
+        - name: REACT_APP_LOGS_SERVICE_URL
+          value: ""
         resources:
           requests:
             memory: "128Mi"
@@ -62,9 +63,10 @@ metadata:
 spec:
   selector:
     app: frontend
+  type: NodePort
   ports:
   - name: http
     protocol: TCP
     port: 80
     targetPort: 80
-  type: ClusterIP
+    nodePort: 30000

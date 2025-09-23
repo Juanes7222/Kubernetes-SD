@@ -11,7 +11,7 @@ DESCRIPTION = "Microservicio de gestión de colaboradores para tareas"
 
 # Server Config
 HOST = os.getenv("HOST", "0.0.0.0")
-PORT = int(os.getenv("PORT", "8004"))
+PORT = int(os.getenv("PORT", "8002"))
 DEBUG = os.getenv("DEBUG", "False").lower() in ("true", "1", "t")
 
 # Paths

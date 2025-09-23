@@ -33,5 +33,5 @@ LOG_FORMAT = os.getenv(
 
 # Auth Service
 AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth-service:8000") + "/api/auth"
-COLLABORATOR_SERVICE_URL = os.getenv("COLLABORATOR_SERVICE_URL", "http://collaborator-service:8004")
+COLLABORATOR_SERVICE_URL = os.getenv("COLLABORATOR_SERVICE_URL", "http://collaborator-service:8002")
 LOGS_SERVICE_URL = os.getenv("LOGS_SERVICE_URL", "http://logs-service:8003") + "/api/logs/client"
