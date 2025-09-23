@@ -1,47 +1,77 @@
+from datetime import datetime, date
+from typing import Any, Dict, Union, Optional
+import json
 from core.logging_config import get_logger
 from fastapi import HTTPException
-from datetime import datetime, date
 
 logger = get_logger(__name__)
 
-def to_firestore_dates(data: dict) -> dict:
-    """
-    Convierte objetos date en ISO strings para Firestore.
-    Modifica y devuelve el dict.
-    """
-    if not data:
-        return data
-    if data.get("due_date") and isinstance(data["due_date"], date):
-        data["due_date"] = data["due_date"].isoformat()
-    return data
+DateType = Union[str, datetime, date]
 
-def from_firestore_dates(data: dict) -> dict:
+def to_firestore_dates(data: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Convierte cadenas ISO en date (si aplica). No falla si el formato es inesperado.
+    Convert all datetime/date objects in a dict to ISO format strings for Firestore compatibility
     """
-    if not data:
-        return data
-    if data.get("due_date"):
+    def _convert(value: Any) -> Any:
+        if isinstance(value, (datetime, date)):
+            return value.isoformat()
+        if isinstance(value, dict):
+            return {k: _convert(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [_convert(item) for item in value]
+        return value
+    
+    return _convert(data) if data else {}
+
+def parse_date(date_str: Optional[str], default: Optional[DateType] = None) -> Optional[DateType]:
+    """
+    Try to parse a date string into a datetime or date object
+    """
+    if not date_str:
+        return default
+    
+    formats = [
+        "%Y-%m-%dT%H:%M:%S.%f%z",  # ISO format con microsegundos y zona
+        "%Y-%m-%dT%H:%M:%S%z",     # ISO format con zona
+        "%Y-%m-%dT%H:%M:%S",       # ISO format sin zona
+        "%Y-%m-%d",                # Solo fecha
+    ]
+    
+    for fmt in formats:
         try:
-            data["due_date"] = datetime.fromisoformat(data["due_date"]).date()
-        except Exception:
-            logger.debug("No se pudo parsear due_date: %s", data.get("due_date"))
-            data["due_date"] = None
-    return data
+            return datetime.strptime(date_str, fmt)
+        except ValueError:
+            continue
+    
+    logger.warning(f"Could not parse the date: {date_str}")
+    return default
 
-async def safe_firebase_call(coro, *args, **kwargs):
+def to_json(obj: Any) -> str:
     """
-    Ejecuta la llamada a firebase_service de forma segura:
-    - Deja pasar HTTPException.
-    - Para cualquier otra excepción se registra y se lanza HTTP 500.
+    Json serialization handling special types
+    """
+    def _default(obj: Any) -> Any:
+        if isinstance(obj, (datetime, date)):
+            return obj.isoformat()
+        return str(obj)
+    
+    return json.dumps(obj, default=_default)
+
+async def safe_firebase_call(coro: Any, *args: Any, **kwargs: Any) -> Any:
+    """
+    Execute a Firebase call safely:
+    - Allows HTTPException to pass through.
     """
     try:
         result = coro(*args, **kwargs)
-        if hasattr(result, "__await__"):  # si es async
+        if hasattr(result, "__await__"):
             return await result
         return result
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception("Error en llamada a Firebase: %s", e)
-        raise HTTPException(status_code=500, detail="Internal server error")
+        logger.exception("Firebase call error: %s", e)
+        raise HTTPException(
+            status_code=500,
+            detail="Internal server error"
+        )
