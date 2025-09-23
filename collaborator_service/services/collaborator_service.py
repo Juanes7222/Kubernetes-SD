@@ -125,7 +125,7 @@ class CollaboratorService:
             return self._enrich_collaborators(updated_task, token)
         except Exception as e:
             write("error", f"Error updating task {task_id}: {str(e)}")
-            return None
+            return None 
 
     def remove_collaborator(
         self, task_id: str, owner_id: str, collaborator_uid: str, token: str
@@ -166,6 +166,8 @@ class CollaboratorService:
             updated_task = doc_ref.get().to_dict()
             if not updated_task:
                 return None
+            
+            updated_task["id"] = task_id  # Asegurar que el ID está presente
 
             write(
                "info",
@@ -195,7 +197,9 @@ class CollaboratorService:
             write("info", f"Access denied for task {task_id} to user {user_id}")
             return None
 
-        return self._enrich_collaborators(task, token)
+        # Enriquecer con información de usuarios y devolver
+        enriched_task = self._enrich_collaborators(task, token)
+        return enriched_task
 
     def _enrich_collaborators(self, task: Dict[str, Any], token: str) -> Dict[str, Any]:
         """Enrich collaborator UIDs with user info"""
@@ -204,13 +208,11 @@ class CollaboratorService:
             return None
 
         task_id = task.get("id")
-        if not task_id and isinstance(task.get("_id"), str):
-            task_id = task.get("_id")  # Fallback para documentos de Firestore
-
         if not task_id:
             write("error", f"Task has no valid ID: {task}")
             return None
 
+        # Procesar colaboradores
         collaborators = task.get("collaborators", [])
         enriched_collaborators = []
 
@@ -224,6 +226,7 @@ class CollaboratorService:
                 }
                 enriched_collaborators.append(collaborator)
 
+        # Devolver el formato esperado por CollaboratorResponse
         return {
             "task_id": task_id,
             "collaborators": enriched_collaborators

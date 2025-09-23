@@ -136,7 +136,26 @@ const TodoApp = () => {
         return t;
       });
 
-      setTasks(enriched);
+      // Si el filtro es "collaborator", entonces obtener los colaboradores
+      if (filter === "collaborator") {
+        const collaboratorTasks = [];
+        for (const task of enriched) {
+          try {
+            const collabResponse = await axios.get(
+              `${COLLABORATOR_SERVICE_URL}/tasks/${task.id}/collaborators`
+            );
+            if (collabResponse.data.collaborators.some(c => c.email === user?.email)) {
+              task.collaborators = collabResponse.data.collaborators;
+              collaboratorTasks.push(task);
+            }
+          } catch (error) {
+            console.error(`Error fetching collaborators for task ${task.id}:`, error);
+          }
+        }
+        setTasks(collaboratorTasks);
+      } else {
+        setTasks(enriched);
+      }
     } catch (error) {
       console.error("Error fetching tasks:", error);
       logger.error(
@@ -255,9 +274,30 @@ const TodoApp = () => {
   };
 
   // Open share dialog for a task
-  const openShareDialog = (task) => {
+  const openShareDialog = async (task) => {
     setShareTask(task);
     setShareUid("");
+    
+    try {
+      // Obtener la tarea actualizada con toda la información de colaboradores
+      console.log("Fetching collaborators for task", task);
+      const response = await axios.get(
+        `${COLLABORATOR_SERVICE_URL}/tasks/${task.id}/collaborators`
+      );
+      console.log("Collaborators response:", response);
+      // Actualizar la tarea con toda la información recibida
+      setShareTask({
+        ...task,  // conservas la tarea original
+        collaborators: response.data.collaborators
+    });
+    } catch (error) {
+      console.error("Error fetching collaborators:", error);
+      logger.error(
+        `Error fetching collaborators: ${error?.message || error}`,
+        user?.email,
+        { taskId: task.id, status: error?.response?.status }
+      );
+    }
   };
 
   const closeShareDialog = () => setShareTask(null);
@@ -266,16 +306,39 @@ const TodoApp = () => {
   const addCollaborator = async () => {
     if (!shareTask || !shareUid) return;
     try {
-      const resp = await axios.post(
+      // Llamada al servicio de colaboradores
+      await axios.post(
         `${COLLABORATOR_SERVICE_URL}/tasks/${shareTask.id}/collaborators`,
         { email: shareUid }
       );
-      setTasks((prev) =>
-        prev.map((t) => (t.id === shareTask.id ? resp.data : t))
+
+      // Obtener los colaboradores actualizados
+      const collabResponse = await axios.get(
+        `${COLLABORATOR_SERVICE_URL}/tasks/${shareTask.id}/collaborators`
       );
+
+      // // Obtener la tarea completa para tener toda la información actualizada
+      // const taskResponse = await axios.get(
+      //   `${TASKS_SERVICE_URL}/tasks/${shareTask.id}`
+      // );
+
+      // Combinar la información de la tarea con los colaboradores
+      const updatedTask = {
+        ...shareTask,
+        collaborators: collabResponse.data.collaborators
+      };
+
+      // Actualizar la tarea compartida
+      setShareTask(updatedTask);
+      
+      // Actualizar la lista de tareas
+      setTasks(prev =>
+        prev.map(t => t.id === shareTask.id ? updatedTask : t)
+      );
+      
+      // Limpiar el campo de email
       setShareUid("");
-      // update local shareTask reference
-      setShareTask(resp.data);
+
       logger.info(
         `Colaborador añadido exitosamente a la tarea ${shareTask.id}`,
         user?.email
@@ -294,15 +357,37 @@ const TodoApp = () => {
   const removeCollaborator = async (identifier) => {
     if (!shareTask) return;
     try {
-      const resp = await axios.delete(
+      // Eliminar el colaborador
+      await axios.delete(
         `${COLLABORATOR_SERVICE_URL}/tasks/${shareTask.id}/collaborators/${encodeURIComponent(
           identifier
         )}`
       );
-      setTasks((prev) =>
-        prev.map((t) => (t.id === shareTask.id ? resp.data : t))
+
+      // Obtener los colaboradores actualizados
+      const collabResponse = await axios.get(
+        `${COLLABORATOR_SERVICE_URL}/tasks/${shareTask.id}/collaborators`
       );
-      setShareTask(resp.data);
+
+      // // Obtener la tarea completa para tener toda la información actualizada
+      // const taskResponse = await axios.get(
+      //   `${TASKS_SERVICE_URL}/tasks/${shareTask.id}`
+      // );
+
+      // Combinar la información de la tarea con los colaboradores
+      const updatedTask = {
+        ...shareTask,
+        collaborators: collabResponse.data.collaborators
+      };
+
+      // Actualizar la tarea compartida
+      setShareTask(updatedTask);
+      
+      // // Actualizar la lista de tareas
+      // setTasks(prev =>
+      //   prev.map(t => t.id === shareTask.id ? updatedTask : t)
+      // );
+
       logger.info(
         `Colaborador eliminado exitosamente de la tarea ${shareTask.id}`,
         user?.email
@@ -675,16 +760,6 @@ const TodoApp = () => {
                             </Badge>
                           )}
 
-                          {/* Mostrar si la tarea fue compartida contigo */}
-                          {task.invited_by && (
-                            <Badge
-                              variant="outline"
-                              className="text-xs border-purple-200 text-purple-700 bg-purple-50"
-                            >
-                              Compartida por {task.invited_by.invited_by_name || task.invited_by.invited_by_email}
-                            </Badge>
-                          )}
-
                           {/* Mostrar owner */}
                           {task.owner && (
                             <Badge
@@ -810,33 +885,6 @@ const TodoApp = () => {
                 </div>
               </div>
 
-              {/* Información de quién te agregó como colaborador */}
-              {shareTask.invited_by && (
-                <div>
-                  <div className="text-sm font-medium mb-2 text-green-700">Te agregó como colaborador</div>
-                  <div className="border rounded p-3 bg-green-50">
-                    <div className="text-sm">
-                      <div className="font-medium flex items-center gap-2">
-                        <User className="h-4 w-4 text-green-600" />
-                        {shareTask.invited_by.invited_by_name || 
-                         shareTask.invited_by.invited_by_email || 
-                         'Usuario desconocido'}
-                      </div>
-                      {shareTask.invited_by.invited_by_email && (
-                        <div className="text-xs text-gray-600 mt-1">
-                          {shareTask.invited_by.invited_by_email}
-                        </div>
-                      )}
-                      {shareTask.invited_by.invited_at && (
-                        <div className="text-xs text-green-600 mt-1">
-                          Invitado el: {new Date(shareTask.invited_by.invited_at).toLocaleDateString()}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
               {/* Añadir colaborador */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -869,6 +917,7 @@ const TodoApp = () => {
                 ) : (
                   <div className="flex flex-col gap-2">
                     {shareTask.collaborators.map((c) => (
+                      console.log("Rendering collaborator", c) ||
                       <div
                         key={c.uid}
                         className="flex items-center justify-between gap-2 border rounded p-3 bg-white"

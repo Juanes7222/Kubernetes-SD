@@ -4,7 +4,7 @@ const sendToBackend = async (payload, retries = 2, delay = 200) => {
   const token = localStorage.getItem('authToken');
   const headers = token ? { Authorization: `Bearer ${token}` } : {};
   try {
-    await axios.post('/api/logs/client', payload, { headers });
+    // await axios.post('/api/logs/client', payload, { headers });
     return true;
   } catch (err) {
     if (retries > 0) {

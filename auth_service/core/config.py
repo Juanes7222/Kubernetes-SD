@@ -48,7 +48,7 @@ class Settings():
     # Configuración de logging
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
     LOG_FORMAT: str = os.getenv("LOG_FORMAT", "%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-    LOG_FILE: Optional[Path] = ROOT_DIR / "logs" / "auth_service.log"
+    # LOG_FILE: Optional[Path] = ROOT_DIR / "logs" / "auth_service.log"
 
 
 @lru_cache()
