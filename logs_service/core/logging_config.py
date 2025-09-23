@@ -8,7 +8,7 @@ LOG_DIR = Path(__file__).parent / "../logs"
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 def get_logger(name: str = "logs_service") -> logging.Logger:
-    """SOLO para uso interno del logs_service - otros servicios NO usan esto"""
+    """Only logs_service has file handler, others not use it"""
     logger = logging.getLogger(name)
     if logger.handlers:
         return logger
@@ -36,7 +36,7 @@ def get_logger(name: str = "logs_service") -> logging.Logger:
     return logger
 
 def write(level: str, message: str, name: Optional[str] = None, **meta: Any) -> None:
-    """Para uso interno del logs_service"""
+    """General logging function"""
     logger = get_logger(name or "logs_service")
     
     if meta:
