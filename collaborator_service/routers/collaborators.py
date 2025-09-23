@@ -1,16 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials
 from typing import Dict, Any
 from services.collaborator_service import collaborator_service
 from models.schemas import CollaboratorCreate, CollaboratorResponse
-from core.auth_middleware import get_current_user
+from core.auth_middleware import get_current_user, security
 from core.logging_config import write, get_logger
 
 logger = get_logger(__name__)
-router = APIRouter(prefix="/collaborators", tags=["collaborators"])
+router = APIRouter(tags=["collaborators"])
 
-@router.post("", response_model=CollaboratorResponse)
+@router.post("/{task_id}/collaborators", response_model=CollaboratorResponse)
 async def add_collaborator(
+    task_id: str,
     collab_data: CollaboratorCreate,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """Add a collaborator to a task"""
@@ -21,10 +24,14 @@ async def add_collaborator(
             detail="Email or UID must be provided"
         )
 
+    # Obtener el token original de las credenciales
+    token = credentials.credentials
+    
     result = collaborator_service.add_collaborator(
-        collab_data.task_id,
+        task_id,
         current_user["uid"],
-        identifier
+        identifier,
+        token
     )
     
     if not result:
@@ -36,7 +43,7 @@ async def add_collaborator(
     write("info", "add_collaborator",
           name=__name__,
           user=current_user["uid"],
-          task_id=collab_data.task_id,
+          task_id=task_id,
           collaborator=identifier)
     
     return result
@@ -45,13 +52,16 @@ async def add_collaborator(
 async def remove_collaborator(
     task_id: str,
     collaborator_id: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """Delete a collaborator from a task"""
+    token = credentials.credentials
     result = collaborator_service.remove_collaborator(
         task_id,
         current_user["uid"],
-        collaborator_id
+        collaborator_id,
+        token
     )
     
     if not result:
@@ -71,10 +81,12 @@ async def remove_collaborator(
 @router.get("/{task_id}", response_model=CollaboratorResponse)
 async def get_collaborators(
     task_id: str,
+    credentials: HTTPAuthorizationCredentials = Depends(security),
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """Get collaborators of a task"""
-    result = collaborator_service.get_collaborators(task_id, current_user["uid"])
+    token = credentials.credentials
+    result = collaborator_service.get_collaborators(task_id, current_user["uid"], token)
     
     if not result:
         raise HTTPException(

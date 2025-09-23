@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional
 from core import config
 
 # URL del servicio de logs
-LOGS_SERVICE_URL = os.getenv("LOGS_SERVICE_URL", "http://logs-service:8003/client")
+LOGS_SERVICE_URL = config.LOGS_SERVICE_URL
 
 def get_logger(name: str) -> logging.Logger:
     """Logger config with console handler and sending to log service"""

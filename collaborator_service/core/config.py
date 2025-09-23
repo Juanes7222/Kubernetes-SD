@@ -32,6 +32,6 @@ LOG_FORMAT = os.getenv(
 )
 
 # Service URLs
-AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth-service:8000")
+AUTH_SERVICE_URL = os.getenv("AUTH_SERVICE_URL", "http://auth-service:8000") + "/api/auth"
 TASKS_SERVICE_URL = os.getenv("TASKS_SERVICE_URL", "http://tasks-service:8001")
 LOGS_SERVICE_URL = os.getenv("LOGS_SERVICE_URL", "http://logs-service:8003/client")

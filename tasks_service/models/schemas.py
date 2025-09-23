@@ -23,4 +23,4 @@ class Task(TaskBase):
     id: str = Field(..., description="Identificador único de la tarea")
     owner_id: str = Field(..., description="ID del usuario propietario")
     created_at: datetime = Field(..., description="Fecha de creación")
-    updated_at: datetime = Field(..., description="Fecha de última actualización")
+    # updated_at: datetime = Field(..., description="Fecha de última actualización")

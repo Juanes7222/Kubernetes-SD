@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import tasks
 from core.logging_config import get_logger
@@ -22,7 +22,7 @@ app.add_middleware(
 )
 
 # Incluir routers
-app.include_router(tasks.router)
+app.include_router(tasks.router, prefix="/api")
 
 @app.get("/health")
 async def health_check():

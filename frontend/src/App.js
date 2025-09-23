@@ -30,8 +30,9 @@ import {
 import { format } from "date-fns";
 import logger from "./lib/logger";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-const API = `${BACKEND_URL}/api`;
+const TASKS_SERVICE_URL = process.env.REACT_APP_TASKS_SERVICE_URL + "/api";
+const AUTH_SERVICE_URL = process.env.REACT_APP_AUTH_SERVICE_URL + "/api/auth";
+const COLLABORATOR_SERVICE_URL = process.env.REACT_APP_COLLABORATOR_SERVICE_URL + "/api";
 
 // Configure axios interceptor to add auth token
 axios.interceptors.request.use(
@@ -103,7 +104,7 @@ const TodoApp = () => {
       if (search) params.search = search;
       if (filter !== "all") params.filter_by = filter;
       
-      const response = await axios.get(`${API}/tasks`, { params });
+      const response = await axios.get(`${TASKS_SERVICE_URL}/tasks`, { params });
       const tasksData = response.data || [];
 
       // Enrich owners: if task.owner is missing but owner_id present, resolve via backend
@@ -118,7 +119,7 @@ const TodoApp = () => {
       // Fetch owners in parallel
       const ownerFetchPromises = Array.from(ownersToFetch).map((uid) =>
         axios
-          .get(`${API}/auth/users/${encodeURIComponent(uid)}`)
+          .get(`${AUTH_SERVICE_URL}/users/${encodeURIComponent(uid)}`)
           .then((r) => ({ uid, info: r.data }))
           .catch(() => ({ uid, info: null }))
       );
@@ -154,7 +155,7 @@ const TodoApp = () => {
   // Create task
   const createTask = async (taskData) => {
     try {
-      const response = await axios.post(`${API}/tasks`, taskData);
+      const response = await axios.post(`${TASKS_SERVICE_URL}/tasks`, taskData);
       setTasks((prev) => [response.data, ...prev]);
       resetForm();
       setIsCreateDialogOpen(false);
@@ -171,7 +172,7 @@ const TodoApp = () => {
   // Update task
   const updateTask = async (taskId, updateData) => {
     try {
-      const response = await axios.put(`${API}/tasks/${taskId}`, updateData);
+      const response = await axios.put(`${TASKS_SERVICE_URL}/tasks/${taskId}`, updateData);
       setTasks((prev) =>
         prev.map((task) => (task.id === taskId ? response.data : task))
       );
@@ -190,7 +191,7 @@ const TodoApp = () => {
   // Delete task
   const deleteTask = async (taskId) => {
     try {
-      await axios.delete(`${API}/tasks/${taskId}`);
+      await axios.delete(`${TASKS_SERVICE_URL}/tasks/${taskId}`);
       setTasks((prev) => prev.filter((task) => task.id !== taskId));
     } catch (error) {
       console.error("Error deleting task:", error);
@@ -205,7 +206,7 @@ const TodoApp = () => {
   // Toggle task completion
   const toggleTaskCompletion = async (taskId) => {
     try {
-      const response = await axios.patch(`${API}/tasks/${taskId}/toggle`);
+      const response = await axios.patch(`${TASKS_SERVICE_URL}/tasks/${taskId}/toggle`);
       setTasks((prev) =>
         prev.map((task) => (task.id === taskId ? response.data : task))
       );
@@ -266,7 +267,7 @@ const TodoApp = () => {
     if (!shareTask || !shareUid) return;
     try {
       const resp = await axios.post(
-        `${API}/tasks/${shareTask.id}/collaborators`,
+        `${COLLABORATOR_SERVICE_URL}/tasks/${shareTask.id}/collaborators`,
         { email: shareUid }
       );
       setTasks((prev) =>
@@ -275,8 +276,17 @@ const TodoApp = () => {
       setShareUid("");
       // update local shareTask reference
       setShareTask(resp.data);
+      logger.info(
+        `Colaborador añadido exitosamente a la tarea ${shareTask.id}`,
+        user?.email
+      );
     } catch (error) {
       console.error("Error adding collaborator:", error);
+      logger.error(
+        `Error al añadir colaborador: ${error?.message || error}`,
+        user?.email,
+        { status: error?.response?.status, taskId: shareTask.id }
+      );
     }
   };
 
@@ -285,7 +295,7 @@ const TodoApp = () => {
     if (!shareTask) return;
     try {
       const resp = await axios.delete(
-        `${API}/tasks/${shareTask.id}/collaborators/${encodeURIComponent(
+        `${COLLABORATOR_SERVICE_URL}/tasks/${shareTask.id}/collaborators/${encodeURIComponent(
           identifier
         )}`
       );
@@ -293,8 +303,17 @@ const TodoApp = () => {
         prev.map((t) => (t.id === shareTask.id ? resp.data : t))
       );
       setShareTask(resp.data);
+      logger.info(
+        `Colaborador eliminado exitosamente de la tarea ${shareTask.id}`,
+        user?.email
+      );
     } catch (error) {
       console.error("Error removing collaborator:", error);
+      logger.error(
+        `Error al eliminar colaborador: ${error?.message || error}`,
+        user?.email,
+        { status: error?.response?.status, taskId: shareTask.id }
+      );
     }
   };
 
