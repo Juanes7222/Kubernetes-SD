@@ -6,9 +6,9 @@ ROOT_DIR = Path(__file__).parent.parent
 load_dotenv(ROOT_DIR / ".env")
 
 class Settings:
-    PROJECT_NAME: str = "Auth Service"
-    DESCRIPTION: str = "Authentication Microservice"
-    VERSION: str = "2.0.0"
+    PROJECT_NAME: str = os.getenv("PROJECT_NAME", "Auth Service")
+    DESCRIPTION: str = os.getenv("DESCRIPTION", "Authentication Microservice")
+    VERSION: str = os.getenv("VERSION", "2.0.0")
 
     CORS_ORIGINS: list[str] = [
         o.strip()
