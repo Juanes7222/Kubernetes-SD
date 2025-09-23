@@ -25,17 +25,6 @@ class TaskService:
         self.db = initialize_firebase()
         self.collection = self.db.collection('tasks')
 
-    def get_user_info(self, user_id: str) -> Optional[Dict[str, Any]]:
-        """Get user info from auth service"""
-        try:
-            response = requests.get(f"{config.AUTH_SERVICE_URL}/users/{user_id}")
-            if response.status_code == 200:
-                return response.json()
-            return None
-        except Exception as e:
-            logger.error(f"Error getting user info: {e}")
-            return None
-
     def create_task(self, task_data: Dict[str, Any], user_id: str) -> Dict[str, Any]:
         """Create a new task for a specific user"""
         task_data = to_firestore_dates(task_data)
