@@ -8,8 +8,7 @@ class CollaboratorBase(BaseModel):
 
 class CollaboratorCreate(CollaboratorBase):
     """Collaborator model for creation"""
-    task_id: str = Field(..., description="Task ID")
-
+    pass
 class Collaborator(CollaboratorBase):
     """Full collaborator model"""
     uid: str

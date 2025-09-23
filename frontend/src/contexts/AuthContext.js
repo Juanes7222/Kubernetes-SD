@@ -53,10 +53,30 @@ export const AuthProvider = ({ children }) => {
     return signOut(auth);
   };
 
-  // Get current ID token
+  // Get current ID token and verify with our backend
   const getIdToken = async () => {
     if (user) {
-      return await user.getIdToken();
+      try {
+        // Get Firebase token
+        const firebaseToken = await user.getIdToken();
+        
+        // Verify token with our backend
+        const response = await fetch(`${process.env.REACT_APP_AUTH_SERVICE_URL}/api/auth/verify`, {
+          headers: {
+            'Authorization': `Bearer ${firebaseToken}`
+          }
+        });
+        
+        if (!response.ok) {
+          console.error('Token verification failed');
+          return null;
+        }
+        
+        return firebaseToken;
+      } catch (error) {
+        console.error('Error verifying token:', error);
+        return null;
+      }
     }
     return null;
   };
@@ -66,9 +86,27 @@ export const AuthProvider = ({ children }) => {
       setUser(user);
       
       if (user) {
-        // Get and store the ID token
-        const token = await user.getIdToken();
-        setIdToken(token);
+        try {
+          // Get Firebase token
+          const firebaseToken = await user.getIdToken();
+          
+          // Verify token with our backend
+          const response = await fetch(`${process.env.REACT_APP_AUTH_SERVICE_URL}/api/auth/verify`, {
+            headers: {
+              'Authorization': `Bearer ${firebaseToken}`
+            }
+          });
+          
+          if (response.ok) {
+            setIdToken(firebaseToken);
+          } else {
+            console.error('Token verification failed');
+            setIdToken(null);
+          }
+        } catch (error) {
+          console.error('Error verifying token:', error);
+          setIdToken(null);
+        }
       } else {
         setIdToken(null);
       }
