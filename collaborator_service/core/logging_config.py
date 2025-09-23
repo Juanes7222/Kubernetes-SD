@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional
 from core import config
 
 # URL del servicio de logs
-LOGS_SERVICE_URL = os.getenv("LOGS_SERVICE_URL", "http://logs-service:8003/client")
+LOGS_SERVICE_URL = config.LOGS_SERVICE_URL
 
 def get_logger(name: str) -> logging.Logger:
     """Logger config with console handler and sending to log service"""
@@ -60,8 +60,3 @@ def write(level: str, action: str, **kwargs: Any) -> None:
     
     # Enviar al servicio de logs
     send_to_log_service(level, message, user=user, meta=meta)
-    
-    # También mantener log local para desarrollo/debug
-    logger = get_logger(__name__)
-    level_method = getattr(logger, level.lower(), logger.info)
-    level_method(message)
