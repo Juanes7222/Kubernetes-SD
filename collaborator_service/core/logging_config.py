@@ -1,61 +1,67 @@
 import logging
-import json
+import os
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict
+import requests
+from typing import Any, Dict, Optional
 from core import config
 
-# Crear el directorio de logs si no existe
-log_dir = Path(config.BASE_DIR) / "logs"
-log_dir.mkdir(exist_ok=True)
+# URL del servicio de logs
+LOGS_SERVICE_URL = os.getenv("LOGS_SERVICE_URL", "http://logs-service:8003/client")
 
-# Configurar el formato del logger
-formatter = logging.Formatter(config.LOG_FORMAT)
-
-def setup_logger(name: str) -> logging.Logger:
-    """Configurar un logger con los parámetros especificados"""
+def get_logger(name: str) -> logging.Logger:
+    """Logger config with console handler and sending to log service"""
     logger = logging.getLogger(name)
     
     if not logger.handlers:
-        # Nivel de log desde la configuración
         logger.setLevel(getattr(logging, config.LOG_LEVEL.upper()))
         
-        # Handler para archivo
-        file_handler = logging.FileHandler(
-            log_dir / f"{config.SERVICE_NAME}.log"
-        )
-        file_handler.setFormatter(formatter)
-        logger.addHandler(file_handler)
-        
-        # Handler para consola
+        # Solo handler de consola para desarrollo local
         console_handler = logging.StreamHandler()
+        formatter = logging.Formatter(config.LOG_FORMAT)
         console_handler.setFormatter(formatter)
         logger.addHandler(console_handler)
         
-        # Evitar propagación a otros loggers
+        # No propagar a otros loggers
         logger.propagate = False
     
     return logger
 
-def get_logger(name: str) -> logging.Logger:
-    """Obtener un logger configurado"""
-    return setup_logger(name)
-
-def format_log_message(action: str, data: Dict[str, Any]) -> str:
-    """Formatear un mensaje de log con datos estructurados"""
-    timestamp = datetime.utcnow().isoformat()
-    log_data = {
-        "timestamp": timestamp,
+def format_log_data(action: str, data: Dict[str, Any]) -> Dict[str, Any]:
+    """Data log format for sending to centralized service"""
+    meta = {
         "service": config.SERVICE_NAME,
+        "logger_name": __name__,
         "action": action,
+        "timestamp": datetime.utcnow().isoformat(),
         **data
     }
-    return json.dumps(log_data)
+    return meta
+
+def send_to_log_service(level: str, message: str, user: Optional[str] = None, meta: Dict[str, Any] = None) -> None:
+    """Send log to centralized service"""
+    try:
+        payload = {
+            "level": level,
+            "message": message,
+            "user": user,
+            "meta": meta or {}
+        }
+        requests.post(LOGS_SERVICE_URL, json=payload, timeout=1)
+    except Exception as e:
+        # Si falla el envío al servicio de logs, al menos logueamos localmente
+        logger = get_logger(__name__)
+        logger.error(f"Error sending log to logs service: {e}")
 
 def write(level: str, action: str, **kwargs: Any) -> None:
-    """Escribir un mensaje de log estructurado"""
-    logger = get_logger(__name__)
-    msg = format_log_message(action, kwargs)
+    """Write structured log and send it to centralized service"""
+    meta = format_log_data(action, kwargs)
+    user = kwargs.get("user")
+    message = f"{action}: " + " ".join(f"{k}={v}" for k, v in kwargs.items() if k != "user")
     
+    # Enviar al servicio de logs
+    send_to_log_service(level, message, user=user, meta=meta)
+    
+    # También mantener log local para desarrollo/debug
+    logger = get_logger(__name__)
     level_method = getattr(logger, level.lower(), logger.info)
-    level_method(msg)
+    level_method(message)
