@@ -21,9 +21,9 @@ data:
   LOGS_SERVICE_URL: "http://logs-service:8003"
   
   # Frontend environment variables (for build-time injection)
-  REACT_APP_TASKS_SERVICE_URL: ""
-  REACT_APP_AUTH_SERVICE_URL: ""
-  REACT_APP_COLLABORATOR_SERVICE_URL: ""
+  REACT_APP_TASKS_SERVICE_URL: "http://tasks-service:8001"
+  REACT_APP_AUTH_SERVICE_URL: "http://auth-service:8000"
+  REACT_APP_COLLABORATOR_SERVICE_URL: "http://collaborator-service:8002"
   
   # CORS Configuration - Allow all origins for now
   CORS_ORIGINS: "*"
