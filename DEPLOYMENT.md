@@ -1,6 +1,44 @@
-# Microservices Task Manager - Public Deployment Guide
+# 🚀 Microservices Task Manager - Deployment Guide
 
-This guide will help you deploy the Microservices Task Manager application to any Kubernetes cluster for public access.
+This guide covers all deployment options for your Kubernetes microservices application, from local development to public cloud deployment.
+
+## 🎯 Quick Start (Local Development)
+
+**For local development with minikube, use the master deployment script:**
+
+```powershell
+# Complete deployment with everything (recommended)
+.\deploy-full.ps1 -WaitForReady -Expose
+
+# Or just deploy locally
+.\deploy-full.ps1 -WaitForReady
+```
+
+## 📋 Available Deployment Scripts
+
+### Master Script: `deploy-full.ps1` (Recommended)
+```powershell
+.\deploy-full.ps1 -Help          # Show all options
+.\deploy-full.ps1               # Full deployment
+.\deploy-full.ps1 -Clean        # Clean deployment
+.\deploy-full.ps1 -Expose       # Deploy and expose publicly
+.\deploy-full.ps1 -SkipBuild    # Skip image building
+```
+
+### Individual Scripts (in `scripts/` folder)
+- `build-images.ps1` - Build all Docker images
+- `deploy.ps1` - Deploy to Kubernetes
+- `rebuild-and-redeploy.ps1` - Rebuild and redeploy services
+- `cleanup.ps1` - Remove all deployments
+
+### Exposure Script
+- `expose-app.ps1` - Set up port forwarding and ngrok for public access
+
+---
+
+# 🌐 Public/Cloud Deployment Guide
+
+This section covers deploying to any Kubernetes cluster for public access.
 
 ## Prerequisites
 
