@@ -28,11 +28,10 @@ spec:
           value: "8001"
         - name: ENVIRONMENT
           value: "production"
-        - name: FIREBASE_CREDENTIALS
-          valueFrom:
-            secretKeyRef:
-              name: firebase-credentials
-              key: kubernetes-sd.json
+        volumeMounts:
+        - name: firebase-credentials
+          mountPath: "/app/secrets"
+          readOnly: true
         resources:
           requests:
             memory: "256Mi"
@@ -52,3 +51,7 @@ spec:
             port: 8001
           initialDelaySeconds: 5
           periodSeconds: 5
+      volumes:
+      - name: firebase-credentials
+        secret:
+          secretName: firebase-credentials

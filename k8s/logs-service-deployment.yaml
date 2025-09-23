@@ -1,38 +1,33 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: tasks-service
+  name: logs-service
   namespace: microservices-app
   labels:
-    app: tasks-service
+    app: logs-service
     version: v1
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
-      app: tasks-service
+      app: logs-service
   template:
     metadata:
       labels:
-        app: tasks-service
+        app: logs-service
         version: v1
     spec:
       containers:
-      - name: tasks-service
-        image: tasks-service:latest
+      - name: logs-service
+        image: logs-service:latest
         imagePullPolicy: IfNotPresent
         ports:
-        - containerPort: 8001
+        - containerPort: 8003
         env:
         - name: PORT
-          value: "8001"
+          value: "8003"
         - name: ENVIRONMENT
           value: "production"
-        - name: FIREBASE_CREDENTIALS
-          valueFrom:
-            secretKeyRef:
-              name: firebase-credentials
-              key: kubernetes-sd.json
         resources:
           requests:
             memory: "256Mi"
@@ -40,15 +35,38 @@ spec:
           limits:
             memory: "512Mi"
             cpu: "500m"
+        volumeMounts:
+        - name: logs-volume
+          mountPath: /app/logs
         livenessProbe:
           httpGet:
             path: /health
-            port: 8001
+            port: 8003
           initialDelaySeconds: 30
           periodSeconds: 10
         readinessProbe:
           httpGet:
             path: /health
-            port: 8001
+            port: 8003
           initialDelaySeconds: 5
           periodSeconds: 5
+      volumes:
+      - name: logs-volume
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: logs-service
+  namespace: microservices-app
+  labels:
+    app: logs-service
+spec:
+  selector:
+    app: logs-service
+  ports:
+  - name: http
+    protocol: TCP
+    port: 8003
+    targetPort: 8003
+  type: ClusterIP
