@@ -9,8 +9,8 @@ import time
 logger = get_logger(__name__)
 
 app = FastAPI(
-    title=f"{settings.PROJECT_NAME} - Auth",
-    description="Authentication Microservice",
+    title=settings.PROJECT_NAME,
+    description=settings.DESCRIPTION,
     version=settings.VERSION,
 )
 
