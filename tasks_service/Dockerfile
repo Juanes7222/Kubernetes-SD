@@ -1,25 +1,18 @@
 FROM python:3.11-slim
 
-ENV PYTHONUNBUFFERED=1
-ENV POETRY_VIRTUALENVS_CREATE=false
-
 WORKDIR /app
 
-# Install system deps
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    ca-certificates \
- && rm -rf /var/lib/apt/lists/*
+# Instalar dependencias
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy requirements and install
-COPY requirements.txt /app/requirements.txt
-RUN pip install --no-cache-dir -r /app/requirements.txt
+# Copiar el servicio directamente dentro del contenedor
+COPY . .
 
-# Copy service code
-COPY . /app
+# Asegurarse de no incluir secretos
+RUN rm -f .env || true
+RUN rm -rf secrets || true
 
 EXPOSE 8001
-
-ENV PORT=8001
 
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]

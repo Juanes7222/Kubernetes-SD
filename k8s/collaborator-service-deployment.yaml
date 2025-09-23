@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: collaborator-service
+  namespace: microservices-app
+  labels:
+    app: collaborator-service
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: collaborator-service
+  template:
+    metadata:
+      labels:
+        app: collaborator-service
+        version: v1
+    spec:
+      containers:
+      - name: collaborator-service
+        image: collaborator-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8002
+        env:
+        - name: PORT
+          value: "8002"
+        - name: ENVIRONMENT
+          value: "production"
+        volumeMounts:
+        - name: firebase-credentials
+          mountPath: "/app/secrets"
+          readOnly: true
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8002
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8002
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: firebase-credentials
+        secret:
+          secretName: firebase-credentials
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: collaborator-service
+  namespace: microservices-app
+  labels:
+    app: collaborator-service
+spec:
+  selector:
+    app: collaborator-service
+  ports:
+  - name: http
+    protocol: TCP
+    port: 8002
+    targetPort: 8002
+  type: ClusterIP
