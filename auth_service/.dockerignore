@@ -1,0 +1,46 @@
+# Git files
+.git
+.gitignore
+
+# Documentation
+README.md
+*.md
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.pytest_cache/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# Testing
+.coverage
+.pytest_cache/
+htmlcov/
+
+# Secrets - exclude everything except Firebase credentials
+secrets/.env
+secrets/*.key
+secrets/*.pem
+# Allow kubernetes-sd.json to be included
+!secrets/kubernetes-sd.json
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db

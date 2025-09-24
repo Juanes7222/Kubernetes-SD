@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: logs-service
+  namespace: microservices-app
+  labels:
+    app: logs-service
+    version: v1
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: logs-service
+  template:
+    metadata:
+      labels:
+        app: logs-service
+        version: v1
+    spec:
+      containers:
+      - name: logs-service
+        image: logs-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8003
+        env:
+        - name: PORT
+          value: "8003"
+        envFrom:
+        - configMapRef:
+            name: microservices-config
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        volumeMounts:
+        - name: logs-volume
+          mountPath: /app/logs
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8003
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8003
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: logs-volume
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: logs-service
+  namespace: microservices-app
+  labels:
+    app: logs-service
+spec:
+  selector:
+    app: logs-service
+  ports:
+  - name: http
+    protocol: TCP
+    port: 8003
+    targetPort: 8003
+  type: ClusterIP

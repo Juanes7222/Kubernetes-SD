@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tasks-service
+  namespace: microservices-app
+  labels:
+    app: tasks-service
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: tasks-service
+  template:
+    metadata:
+      labels:
+        app: tasks-service
+        version: v1
+    spec:
+      containers:
+      - name: tasks-service
+        image: tasks-service:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8001
+        env:
+        - name: PORT
+          value: "8001"
+        envFrom:
+        - configMapRef:
+            name: microservices-config
+        volumeMounts:
+        - name: firebase-credentials
+          mountPath: "/app/secrets"
+          readOnly: true
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: firebase-credentials
+        secret:
+          secretName: firebase-credentials

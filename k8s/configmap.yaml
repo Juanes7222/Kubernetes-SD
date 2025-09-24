@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: microservices-config
+  namespace: microservices-app
+data:
+  # Common settings
+  ENVIRONMENT: "production"
+  DEBUG: "false"
+  HOST: "0.0.0.0"
+  
+  # Logging
+  LOG_LEVEL: "INFO"
+  LOG_FORMAT: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  
+  # Service URLs for inter-service communication
+  # These URLs are used by services to communicate with each other
+  AUTH_SERVICE_URL: "http://auth-service:8000"
+  TASKS_SERVICE_URL: "http://tasks-service:8001"
+  COLLABORATOR_SERVICE_URL: "http://collaborator-service:8002"
+  LOGS_SERVICE_URL: "http://logs-service:8003"
+  
+  # Frontend environment variables (for build-time injection)
+  REACT_APP_TASKS_SERVICE_URL: "http://tasks-service:8001"
+  REACT_APP_AUTH_SERVICE_URL: "http://auth-service:8000"
+  REACT_APP_COLLABORATOR_SERVICE_URL: "http://collaborator-service:8002"
+  
+  # CORS Configuration - Allow all origins for now
+  CORS_ORIGINS: "*"
+  
+  # Security
+  SECRET_KEY: "kubernetes-sd-production-secret-key-2024"
+  ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+  
+  # Firebase credential path (mounted as secret)
+  FIREBASE_CRED_PATH: "/app/secrets/kubernetes-sd.json"
+  FIREBASE_CREDENTIALS_PATH: "/app/secrets/kubernetes-sd.json"
+  
+  # Service-specific ports
+  AUTH_SERVICE_PORT: "8000"
+  TASKS_SERVICE_PORT: "8001"
+  COLLABORATOR_SERVICE_PORT: "8002"
+  LOGS_SERVICE_PORT: "8003"
