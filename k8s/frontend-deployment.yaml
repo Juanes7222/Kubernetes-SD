@@ -23,16 +23,7 @@ spec:
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 80
-        env:
-        # Use relative URLs so the frontend works with any public domain/IP
-        - name: REACT_APP_AUTH_SERVICE_URL
-          value: ""
-        - name: REACT_APP_TASKS_SERVICE_URL
-          value: ""
-        - name: REACT_APP_COLLABORATOR_SERVICE_URL
-          value: ""
-        - name: REACT_APP_LOGS_SERVICE_URL
-          value: ""
+        # Environment variables are now baked into the Docker image
         resources:
           requests:
             memory: "128Mi"
