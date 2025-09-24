@@ -61,7 +61,7 @@ export const AuthProvider = ({ children }) => {
         const firebaseToken = await user.getIdToken();
         
         // Verify token with our backend
-        const response = await fetch(`${process.env.REACT_APP_AUTH_SERVICE_URL}/api/auth/verify`, {
+        const response = await fetch(`${process.env.REACT_APP_AUTH_SERVICE_URL}/verify`, {
           headers: {
             'Authorization': `Bearer ${firebaseToken}`
           }
@@ -91,7 +91,7 @@ export const AuthProvider = ({ children }) => {
           const firebaseToken = await user.getIdToken();
           
           // Verify token with our backend
-          const response = await fetch(`${process.env.REACT_APP_AUTH_SERVICE_URL}/api/auth/verify`, {
+          const response = await fetch(`${process.env.REACT_APP_AUTH_SERVICE_URL}/verify`, {
             headers: {
               'Authorization': `Bearer ${firebaseToken}`
             }

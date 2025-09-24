@@ -30,9 +30,9 @@ import {
 import { format } from "date-fns";
 import logger from "./lib/logger";
 
-const TASKS_SERVICE_URL = process.env.REACT_APP_TASKS_SERVICE_URL + "/api";
-const AUTH_SERVICE_URL = process.env.REACT_APP_AUTH_SERVICE_URL + "/api/auth";
-const COLLABORATOR_SERVICE_URL = process.env.REACT_APP_COLLABORATOR_SERVICE_URL + "/api";
+const TASKS_SERVICE_URL = process.env.REACT_APP_TASKS_SERVICE_URL;
+const AUTH_SERVICE_URL = process.env.REACT_APP_AUTH_SERVICE_URL;
+const COLLABORATOR_SERVICE_URL = process.env.REACT_APP_COLLABORATOR_SERVICE_URL;
 
 // Configure axios interceptor to add auth token
 axios.interceptors.request.use(
@@ -104,7 +104,7 @@ const TodoApp = () => {
       if (search) params.search = search;
       if (filter !== "all") params.filter_by = filter;
       
-      const response = await axios.get(`${TASKS_SERVICE_URL}/tasks`, { params });
+      const response = await axios.get(`${TASKS_SERVICE_URL}`, { params });
       const tasksData = response.data || [];
 
       // Enrich owners: if task.owner is missing but owner_id present, resolve via backend
@@ -174,7 +174,7 @@ const TodoApp = () => {
   // Create task
   const createTask = async (taskData) => {
     try {
-      const response = await axios.post(`${TASKS_SERVICE_URL}/tasks`, taskData);
+      const response = await axios.post(`${TASKS_SERVICE_URL}`, taskData);
       setTasks((prev) => [response.data, ...prev]);
       resetForm();
       setIsCreateDialogOpen(false);
