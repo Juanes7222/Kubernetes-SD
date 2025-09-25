@@ -29,10 +29,8 @@ spec:
         envFrom:
         - configMapRef:
             name: microservices-config
-        volumeMounts:
-        - name: firebase-credentials
-          mountPath: "/app/secrets"
-          readOnly: true
+        - secretRef:
+            name: firebase-credentials
         resources:
           requests:
             memory: "256Mi"
@@ -52,10 +50,6 @@ spec:
             port: 8000
           initialDelaySeconds: 5
           periodSeconds: 5
-      volumes:
-      - name: firebase-credentials
-        secret:
-          secretName: firebase-credentials
 ---
 apiVersion: v1
 kind: Service
