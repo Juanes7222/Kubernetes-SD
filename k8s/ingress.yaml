@@ -25,7 +25,7 @@ spec:
               number: 8000
 
       # Tasks Service
-      - path: /api
+      - path: /api/tasks
         pathType: Prefix
         backend:
           service:
@@ -34,7 +34,7 @@ spec:
               number: 8001
 
       # Collaborator Service
-      - path: /api
+      - path: /api/collaborators
         pathType: Prefix
         backend:
           service:
@@ -43,7 +43,7 @@ spec:
               number: 8002
 
       # Logs Service
-      - path: /api
+      - path: /api/logs
         pathType: Prefix
         backend:
           service:

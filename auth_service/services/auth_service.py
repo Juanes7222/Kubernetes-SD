@@ -1,17 +1,21 @@
 import firebase_admin
-from firebase_admin import credentials, auth
+from firebase_admin import credentials, auth, firestore
 from pathlib import Path
 from typing import Optional, Dict, Any
 from core.logging_config import get_logger
+from core import config
 
 logger = get_logger(__name__)
 
 # Inicializar Firebase Admin SDK
 def initialize_firebase():
     if not firebase_admin._apps:
-        cred_path = Path(__file__).parent / '../secrets/kubernetes-sd.json'
+        cred_path = Path(config.FIREBASE_CRED_PATH)
+        if not cred_path.is_file():
+            raise FileNotFoundError(f"Firebase credentials not found at {cred_path}")
         cred = credentials.Certificate(str(cred_path))
         firebase_admin.initialize_app(cred)
+    return firestore.client()
 
 initialize_firebase()
 

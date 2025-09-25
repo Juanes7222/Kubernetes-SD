@@ -46,13 +46,13 @@ spec:
         env:
         - name: PORT
           value: "8000"
-        - name: ENVIRONMENT
-          value: "production"
-        - name: FIREBASE_CREDENTIALS
-          valueFrom:
-            secretKeyRef:
-              name: firebase-credentials
-              key: kubernetes-sd.json
+        envFrom:
+        - configMapRef:
+            name: microservices-config
+        volumeMounts:
+        - name: firebase-credentials
+          mountPath: "/app/secrets"
+          readOnly: true
         resources:
           requests:
             memory: "256Mi"
@@ -72,6 +72,10 @@ spec:
             port: 8000
           initialDelaySeconds: 5
           periodSeconds: 5
+      volumes:
+      - name: firebase-credentials
+        secret:
+          secretName: firebase-credentials
 ---
 apiVersion: v1
 kind: Service
