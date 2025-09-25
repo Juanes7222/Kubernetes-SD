@@ -27,6 +27,8 @@ def get_tasks(
     search: Optional[str] = None,
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
+    logger.info(f"get_tasks called with filter_by={filter_by}, search={search}, user={current_user.get('email')}")
+    
     all_tasks = firebase_service.get_tasks(current_user["uid"], search)
     if filter_by == "owned":
         tasks = [task for task in all_tasks if task.get("owner", {}).get("uid") == current_user["uid"]]
@@ -37,6 +39,24 @@ def get_tasks(
 
     write("info", "get_tasks", name=__name__, user=current_user.get("email") or current_user.get("uid"), count=len(tasks))
     return [Task(**task) for task in tasks]
+
+
+@router.get("/debug", response_model=Dict[str, Any])
+def debug_tasks(
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Debug endpoint to see raw task data"""
+    user_id = current_user["uid"]
+    
+    # Get all task
+    all_tasks = firebase_service.get_tasks(user_id)
+    
+    return {
+        "user_id": user_id,
+        "user_email": current_user.get("email"),
+        "all_count": len(all_tasks),
+        "all_tasks": [{"id": t.get("id"), "title": t.get("title"), "owner_id": t.get("owner_id"), "collaborators": len(t.get("collaborators", []))} for t in all_tasks]
+    }
 
 
 @router.get("/{task_id}", response_model=Task)

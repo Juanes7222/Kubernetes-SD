@@ -67,11 +67,13 @@ const TodoApp = () => {
   const { user, logout, getIdToken } = useAuth();
   const [tasks, setTasks] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [taskFilter, setTaskFilter] = useState("all"); // all, owned, collaborator, assigned
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [loading, setLoading] = useState(true);
   const [shareTask, setShareTask] = useState(null);
   const [shareUid, setShareUid] = useState("");
+  
 
   // Form states
   const [formData, setFormData] = useState({
@@ -95,11 +97,45 @@ const TodoApp = () => {
   }, [user, getIdToken]);
 
   // Fetch tasks
-  const fetchTasks = async (search = "") => {
+  const fetchTasks = async (search = "", filter = taskFilter) => {
     try {
-      const params = search ? { search } : {};
+      const params = {};
+      if (search) params.search = search;
+      if (filter !== "all") params.filter_by = filter;
+      
       const response = await axios.get(`${API}/tasks`, { params });
-      setTasks(response.data);
+      const tasksData = response.data || [];
+
+      // Enrich owners: if task.owner is missing but owner_id present, resolve via backend
+      const ownerCache = {};
+      const ownersToFetch = new Set();
+      tasksData.forEach((t) => {
+        if ((!t.owner || !t.owner.email) && t.owner_id) {
+          ownersToFetch.add(t.owner_id);
+        }
+      });
+
+      // Fetch owners in parallel
+      const ownerFetchPromises = Array.from(ownersToFetch).map((uid) =>
+        axios
+          .get(`${API}/auth/users/${encodeURIComponent(uid)}`)
+          .then((r) => ({ uid, info: r.data }))
+          .catch(() => ({ uid, info: null }))
+      );
+
+      const ownerResults = await Promise.all(ownerFetchPromises);
+      ownerResults.forEach(({ uid, info }) => {
+        if (info) ownerCache[uid] = info;
+      });
+
+      const enriched = tasksData.map((t) => {
+        if ((!t.owner || !t.owner.email) && t.owner_id && ownerCache[t.owner_id]) {
+          t.owner = ownerCache[t.owner_id];
+        }
+        return t;
+      });
+
+      setTasks(enriched);
     } catch (error) {
       console.error("Error fetching tasks:", error);
       logger.error(
@@ -299,18 +335,18 @@ const TodoApp = () => {
     if (user) {
       fetchTasks();
     }
-  }, [user]);
+  }, [user, taskFilter]);
 
   // Search functionality
   useEffect(() => {
     if (user) {
       const timeoutId = setTimeout(() => {
-        fetchTasks(searchQuery);
+        fetchTasks(searchQuery, taskFilter);
       }, 500);
 
       return () => clearTimeout(timeoutId);
     }
-  }, [searchQuery, user]);
+  }, [searchQuery, user, taskFilter]);
 
   if (loading) {
     return (
@@ -364,6 +400,31 @@ const TodoApp = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 bg-white border-gray-200"
               />
+            </div>
+
+            {/* Filtros de tareas */}
+            <div className="flex gap-2">
+              <Button
+                variant={taskFilter === "all" ? "default" : "outline"}
+                onClick={() => setTaskFilter("all")}
+                size="sm"
+              >
+                Todas
+              </Button>
+              <Button
+                variant={taskFilter === "owned" ? "default" : "outline"}
+                onClick={() => setTaskFilter("owned")}
+                size="sm"
+              >
+                Propias
+              </Button>
+              <Button
+                variant={taskFilter === "collaborator" ? "default" : "outline"}
+                onClick={() => setTaskFilter("collaborator")}
+                size="sm"
+              >
+                Colaboración
+              </Button>
             </div>
 
             <Dialog
@@ -593,6 +654,27 @@ const TodoApp = () => {
                               Completada
                             </Badge>
                           )}
+
+                          {/* Mostrar si la tarea fue compartida contigo */}
+                          {task.invited_by && (
+                            <Badge
+                              variant="outline"
+                              className="text-xs border-purple-200 text-purple-700 bg-purple-50"
+                            >
+                              Compartida por {task.invited_by.invited_by_name || task.invited_by.invited_by_email}
+                            </Badge>
+                          )}
+
+                          {/* Mostrar owner */}
+                          {task.owner && (
+                            <Badge
+                              variant="outline"
+                              className="text-xs border-blue-200 text-blue-700 bg-blue-50"
+                            >
+                              <User className="h-3 w-3 mr-1" />
+                              Creada por {task.owner.display_name || task.owner.email}
+                            </Badge>
+                          )}
                         </div>
                       </div>
 
@@ -605,6 +687,21 @@ const TodoApp = () => {
                         >
                           <Edit3 className="h-4 w-4" />
                         </Button>
+                        
+                        {/* Mostrar botones de eliminar y compartir solo para el propietario */}
+
+                    {(task.owner?.uid === user?.uid) && (
+                      <>
+                       <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openShareDialog(task)}
+                            className="text-gray-400 hover:text-gray-600"
+                            title="Compartir"
+                          >
+                            <User className="h-4 w-4" />
+                          </Button>
+                        
                         <Button
                           variant="ghost"
                           size="sm"
@@ -613,16 +710,20 @@ const TodoApp = () => {
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => openShareDialog(task)}
-                          className="text-gray-400 hover:text-gray-600"
-                          title="Compartir"
-                        >
-                          <User className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      </>
+                    )}
+                    {/* Mostrar botones de editar para colaboradores*/}
+                      {(task.owner?.uid === user?.uid || 
+                        task.collaborators?.some(collab => 
+                        collab.email === user?.email
+                        )) && (
+                        <>
+                        
+
+                         
+                        </>
+                      )}
+                    </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -648,16 +749,76 @@ const TodoApp = () => {
             <DialogTitle>Compartir tarea</DialogTitle>
           </DialogHeader>
           {shareTask && (
-            <div className="space-y-4">
-              <div>
+            <div className="space-y-6">
+              {/* Información de la tarea */}
+              <div className="pb-4 border-b">
                 <div className="text-sm font-medium">{shareTask.title}</div>
-                <div className="text-xs text-gray-500">
-                  {shareTask.description}
+                {shareTask.description && (
+                  <div className="text-xs text-gray-500 mt-1">
+                    {shareTask.description}
+                  </div>
+                )}
+                {shareTask.due_date && (
+                  <div className="text-xs text-gray-400 mt-1">
+                    Vence: {formatDate(shareTask.due_date)}
+                  </div>
+                )}
+              </div>
+
+              {/* Información del creador */}
+              <div>
+                <div className="text-sm font-medium mb-2 text-blue-700">Creador de la tarea</div>
+                <div className="border rounded p-3 bg-blue-50">
+                  <div className="text-sm">
+                    <div className="font-medium flex items-center gap-2">
+                      <User className="h-4 w-4 text-blue-600" />
+                      {shareTask.owner?.display_name || 
+                       shareTask.owner?.email || 
+                       shareTask.owner?.uid || 
+                       'Usuario desconocido'}
+                    </div>
+                    {shareTask.owner?.email && (
+                      <div className="text-xs text-gray-600 mt-1">
+                        {shareTask.owner.email}
+                      </div>
+                    )}
+                    <div className="text-xs text-blue-600 mt-1 font-medium">
+                      Propietario
+                    </div>
+                  </div>
                 </div>
               </div>
 
+              {/* Información de quién te agregó como colaborador */}
+              {shareTask.invited_by && (
+                <div>
+                  <div className="text-sm font-medium mb-2 text-green-700">Te agregó como colaborador</div>
+                  <div className="border rounded p-3 bg-green-50">
+                    <div className="text-sm">
+                      <div className="font-medium flex items-center gap-2">
+                        <User className="h-4 w-4 text-green-600" />
+                        {shareTask.invited_by.invited_by_name || 
+                         shareTask.invited_by.invited_by_email || 
+                         'Usuario desconocido'}
+                      </div>
+                      {shareTask.invited_by.invited_by_email && (
+                        <div className="text-xs text-gray-600 mt-1">
+                          {shareTask.invited_by.invited_by_email}
+                        </div>
+                      )}
+                      {shareTask.invited_by.invited_at && (
+                        <div className="text-xs text-green-600 mt-1">
+                          Invitado el: {new Date(shareTask.invited_by.invited_at).toLocaleDateString()}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Añadir colaborador */}
               <div>
-                <label className="block text-xs text-gray-600 mb-1">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Añadir colaborador por correo electrónico
                 </label>
                 <div className="flex gap-2">
@@ -665,29 +826,31 @@ const TodoApp = () => {
                     value={shareUid}
                     onChange={(e) => setShareUid(e.target.value)}
                     placeholder="correo@ejemplo.com"
+                    className="border-gray-200"
                   />
                   <Button
                     onClick={addCollaborator}
-                    className="bg-gray-900 text-white"
+                    className="bg-gray-900 text-white hover:bg-gray-800"
                   >
                     Invitar
                   </Button>
                 </div>
               </div>
 
+              {/* Lista de colaboradores */}
               <div>
                 <div className="text-sm font-medium mb-2">Colaboradores</div>
                 {!shareTask.collaborators ||
                 shareTask.collaborators.length === 0 ? (
-                  <div className="text-xs text-gray-500">
-                    No hay colaboradores
+                  <div className="text-xs text-gray-500 p-3 border rounded bg-gray-50">
+                    No hay colaboradores añadidos
                   </div>
                 ) : (
                   <div className="flex flex-col gap-2">
                     {shareTask.collaborators.map((c) => (
                       <div
                         key={c.uid}
-                        className="flex items-center justify-between gap-2 border rounded p-2"
+                        className="flex items-center justify-between gap-2 border rounded p-3 bg-white"
                       >
                         <div className="text-sm">
                           <div className="font-medium">
@@ -701,6 +864,7 @@ const TodoApp = () => {
                           variant="ghost"
                           size="sm"
                           onClick={() => removeCollaborator(c.uid)}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
                         >
                           Eliminar
                         </Button>
@@ -710,7 +874,8 @@ const TodoApp = () => {
                 )}
               </div>
 
-              <div className="flex justify-end">
+              {/* Botones de acción */}
+              <div className="flex justify-end pt-4 border-t">
                 <Button variant="outline" onClick={closeShareDialog}>
                   Cerrar
                 </Button>
@@ -718,7 +883,7 @@ const TodoApp = () => {
             </div>
           )}
         </DialogContent>
-      </Dialog>
+      </Dialog>      
     </>
   );
 };
