@@ -12,7 +12,9 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-  - http:
+  - host: microservices-app.localtest.me
+    http:
+  # - http:
       paths:
       # API services must come first to be matched before the frontend catch-all
       # Auth Service

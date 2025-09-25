@@ -24,6 +24,9 @@ spec:
         ports:
         - containerPort: 80
         # Environment variables are now baked into the Docker image
+        envFrom:
+        - configMapRef:
+            name: microservices-config
         resources:
           requests:
             memory: "128Mi"

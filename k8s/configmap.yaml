@@ -21,10 +21,11 @@ data:
   LOGS_SERVICE_URL: "http://logs-service:8003"
   
   # Frontend environment variables (for build-time injection)
-  REACT_APP_TASKS_SERVICE_URL: "http://microservices-app.local/api/tasks"
-  REACT_APP_AUTH_SERVICE_URL: "http://microservices-app.local/api/auth"
-  REACT_APP_COLLABORATOR_SERVICE_URL: "http://microservices-app.local/api/collaborators"
-  REACT_APP_LOGS_SERVICE_URL: "http://microservices-app.local/api/logs"
+  REACT_APP_TASKS_SERVICE_URL: "http://microservices-app.localtest.me/api/tasks"
+  REACT_APP_AUTH_SERVICE_URL: "http://microservices-app.localtest.me/api/auth"
+  REACT_APP_COLLABORATOR_SERVICE_URL: "http://microservices-app.localtest.me/api/collaborators"
+  REACT_APP_LOGS_SERVICE_URL: "http://microservices-app.localtest.me/api/logs"
+
 
   
   # CORS Configuration - Allow all origins for now
@@ -43,3 +44,11 @@ data:
   TASKS_SERVICE_PORT: "8001"
   COLLABORATOR_SERVICE_PORT: "8002"
   LOGS_SERVICE_PORT: "8003"
+
+  REACT_APP_FIREBASE_API_KEY: "AIzaSyCcYYZDoVVOGhXnpmvF02Fyf9U-NTw1jTk"
+  REACT_APP_FIREBASE_AUTH_DOMAIN: "kubernetes-sd-13b8b.firebaseapp.com"
+  REACT_APP_FIREBASE_PROJECT_ID: "kubernetes-sd-13b8b"
+  REACT_APP_FIREBASE_STORAGE_BUCKET: "kubernetes-sd-13b8b.firebasestorage.app"
+  REACT_APP_FIREBASE_MESSAGING_SENDER_ID: "717690562954"
+  REACT_APP_FIREBASE_APP_ID: "1:717690562954:web:bbb246c5fe654c9dbd0073"
+  REACT_APP_MEASUREMENT_ID: "G-5SM9GDKGYL"
