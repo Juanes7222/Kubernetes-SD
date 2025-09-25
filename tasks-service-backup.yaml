@@ -1,0 +1,105 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "12"
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"app":"tasks-service","version":"v1"},"name":"tasks-service","namespace":"microservices-app"},"spec":{"replicas":2,"selector":{"matchLabels":{"app":"tasks-service"}},"template":{"metadata":{"labels":{"app":"tasks-service","version":"v1"}},"spec":{"containers":[{"env":[{"name":"PORT","value":"8001"},{"name":"ENVIRONMENT","value":"production"},{"name":"FIREBASE_CREDENTIALS","valueFrom":{"secretKeyRef":{"key":"kubernetes-sd.json","name":"firebase-credentials"}}}],"image":"tasks-service:latest","imagePullPolicy":"IfNotPresent","livenessProbe":{"httpGet":{"path":"/health","port":8001},"initialDelaySeconds":30,"periodSeconds":10},"name":"tasks-service","ports":[{"containerPort":8001}],"readinessProbe":{"httpGet":{"path":"/health","port":8001},"initialDelaySeconds":5,"periodSeconds":5},"resources":{"limits":{"cpu":"500m","memory":"512Mi"},"requests":{"cpu":"250m","memory":"256Mi"}}}]}}}}
+  creationTimestamp: "2025-09-25T01:10:18Z"
+  generation: 12
+  labels:
+    app: tasks-service
+    version: v1
+  name: tasks-service
+  namespace: microservices-app
+  resourceVersion: "4451"
+  uid: 62aac04b-d9a3-4029-9563-9f4985dac8bd
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 2
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: tasks-service
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      annotations:
+        kubectl.kubernetes.io/restartedAt: "2025-09-24T20:38:49-05:00"
+      labels:
+        app: tasks-service
+        version: v1
+    spec:
+      containers:
+      - env:
+        - name: PORT
+          value: "8001"
+        - name: ENVIRONMENT
+          value: production
+        - name: FIREBASE_CREDENTIALS
+          valueFrom:
+            secretKeyRef:
+              key: kubernetes-sd.json
+              name: firebase-credentials
+        image: tasks-service:latest
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: 8001
+            scheme: HTTP
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 1
+        name: tasks-service
+        ports:
+        - containerPort: 8001
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: 8001
+            scheme: HTTP
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          successThreshold: 1
+          timeoutSeconds: 1
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 250m
+            memory: 256Mi
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+status:
+  conditions:
+  - lastTransitionTime: "2025-09-25T01:10:18Z"
+    lastUpdateTime: "2025-09-25T01:10:18Z"
+    message: Deployment does not have minimum availability.
+    reason: MinimumReplicasUnavailable
+    status: "False"
+    type: Available
+  - lastTransitionTime: "2025-09-25T01:10:18Z"
+    lastUpdateTime: "2025-09-25T01:38:50Z"
+    message: ReplicaSet "tasks-service-86d5b574b9" is progressing.
+    reason: ReplicaSetUpdated
+    status: "True"
+    type: Progressing
+  observedGeneration: 12
+  replicas: 3
+  unavailableReplicas: 3
+  updatedReplicas: 1

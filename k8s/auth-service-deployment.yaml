@@ -27,10 +27,25 @@ spec:
         - name: PORT
           value: "8000"
         envFrom:
+        # Load common configuration
         - configMapRef:
-            name: microservices-config
+            name: common-config
+        # Load service URLs
+        - configMapRef:
+            name: service-urls-config
+        # Load service ports
+        - configMapRef:
+            name: service-ports-config
+        # Load environment-specific config (production by default)
+        - configMapRef:
+            name: environment-config
+        # Load application secrets
         - secretRef:
-            name: firebase-credentials
+            name: app-secrets
+        volumeMounts:
+        - name: firebase-credentials
+          mountPath: "/app/secrets"
+          readOnly: true
         resources:
           requests:
             memory: "256Mi"
@@ -50,6 +65,10 @@ spec:
             port: 8000
           initialDelaySeconds: 5
           periodSeconds: 5
+      volumes:
+      - name: firebase-credentials
+        secret:
+          secretName: firebase-credentials
 ---
 apiVersion: v1
 kind: Service

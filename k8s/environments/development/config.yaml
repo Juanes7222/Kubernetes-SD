@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: environment-config
+  namespace: microservices-app
+  labels:
+    app: microservices-app
+    component: config
+    environment: development
+data:
+  # Development environment settings
+  ENVIRONMENT: "development"
+  DEBUG: "true"
+  LOG_LEVEL: "DEBUG"
+  
+  # CORS - Allow localhost for development
+  CORS_ORIGINS: "http://localhost:3000,http://localhost:3001"
+  
+  # Service URLs for development (can be port-forwards or NodePort services)
+  AUTH_SERVICE_URL: "http://localhost:30000"
+  TASKS_SERVICE_URL: "http://localhost:30001"
+  COLLABORATOR_SERVICE_URL: "http://localhost:30002"
+  LOGS_SERVICE_URL: "http://localhost:30003"

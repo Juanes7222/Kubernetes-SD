@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: service-urls-config
+  namespace: microservices-app
+  labels:
+    app: microservices-app
+    component: config
+data:
+  # Service URLs for inter-service communication
+  # These URLs use Kubernetes service discovery
+  AUTH_SERVICE_URL: "http://auth-service:8000"
+  TASKS_SERVICE_URL: "http://tasks-service:8001"
+  COLLABORATOR_SERVICE_URL: "http://collaborator-service:8002"
+  LOGS_SERVICE_URL: "http://logs-service:8003"
+  
+  # Frontend environment variables (for React build-time injection)
+  # Using localhost for development with port forwarding
+  REACT_APP_AUTH_SERVICE_URL: "http://localhost:8000"
+  REACT_APP_TASKS_SERVICE_URL: "http://localhost:8001"
+  REACT_APP_COLLABORATOR_SERVICE_URL: "http://localhost:8002"

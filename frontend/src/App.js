@@ -34,6 +34,10 @@ const TASKS_SERVICE_URL = process.env.REACT_APP_TASKS_SERVICE_URL;
 const AUTH_SERVICE_URL = process.env.REACT_APP_AUTH_SERVICE_URL;
 const COLLABORATOR_SERVICE_URL = process.env.REACT_APP_COLLABORATOR_SERVICE_URL;
 
+console.log("TASKS_SERVICE_URL:", TASKS_SERVICE_URL);
+console.log("AUTH_SERVICE_URL:", AUTH_SERVICE_URL);
+console.log("COLLABORATOR_SERVICE_URL:", COLLABORATOR_SERVICE_URL);
+
 // Configure axios interceptor to add auth token
 axios.interceptors.request.use(
   (config) => {

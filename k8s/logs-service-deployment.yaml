@@ -27,8 +27,21 @@ spec:
         - name: PORT
           value: "8003"
         envFrom:
+        # Load common configuration
         - configMapRef:
-            name: microservices-config
+            name: common-config
+        # Load service URLs
+        - configMapRef:
+            name: service-urls-config
+        # Load service ports
+        - configMapRef:
+            name: service-ports-config
+        # Load environment-specific config (production by default)
+        - configMapRef:
+            name: environment-config
+        # Load application secrets (logs service doesn't need JWT secrets, but keeping for consistency)
+        - secretRef:
+            name: app-secrets
         resources:
           requests:
             memory: "256Mi"

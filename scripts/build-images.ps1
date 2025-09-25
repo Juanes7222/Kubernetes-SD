@@ -76,6 +76,7 @@ function Build-DockerImage {
 }
 
 # Build all services
+& minikube docker-env | Invoke-Expression
 $success = $true
 foreach ($service in $services.GetEnumerator()) {
     $result = Build-DockerImage -ServiceName $service.Key -ServicePath $service.Value -RootDirectory $rootDir

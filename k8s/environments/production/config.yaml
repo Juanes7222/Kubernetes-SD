@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: environment-config
+  namespace: microservices-app
+  labels:
+    app: microservices-app
+    component: config
+    environment: production
+data:
+  # Production environment settings
+  ENVIRONMENT: "production"
+  DEBUG: "false"
+  LOG_LEVEL: "INFO"
+  
+  # CORS - Restrict to specific domains in production
+  CORS_ORIGINS: "*"
+  
+  # Service URLs use Kubernetes internal DNS
+  AUTH_SERVICE_URL: "http://auth-service:8000"
+  TASKS_SERVICE_URL: "http://tasks-service:8001"
+  COLLABORATOR_SERVICE_URL: "http://collaborator-service:8002"
+  LOGS_SERVICE_URL: "http://logs-service:8003"
