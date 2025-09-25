@@ -16,7 +16,7 @@ DEBUG = os.getenv("DEBUG", "False").lower() in ("true", "1", "t")
 
 # Paths
 BASE_DIR = Path(__file__).parent.parent
-SECRETS_DIR = BASE_DIR / "secrets"
+SECRETS_DIR = BASE_DIR.parent / "secrets"
 
 # Firebase
 FIREBASE_CRED_PATH = os.getenv(

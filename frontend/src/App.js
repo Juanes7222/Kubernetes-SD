@@ -142,7 +142,7 @@ const TodoApp = () => {
         for (const task of enriched) {
           try {
             const collabResponse = await axios.get(
-              `${COLLABORATOR_SERVICE_URL}/tasks/${task.id}/collaborators`
+              `${COLLABORATOR_SERVICE_URL}/${task.id}`
             );
             if (collabResponse.data.collaborators.some(c => c.email === user?.email)) {
               task.collaborators = collabResponse.data.collaborators;
@@ -191,7 +191,7 @@ const TodoApp = () => {
   // Update task
   const updateTask = async (taskId, updateData) => {
     try {
-      const response = await axios.put(`${TASKS_SERVICE_URL}/tasks/${taskId}`, updateData);
+      const response = await axios.put(`${TASKS_SERVICE_URL}/${taskId}`, updateData);
       setTasks((prev) =>
         prev.map((task) => (task.id === taskId ? response.data : task))
       );
@@ -210,7 +210,7 @@ const TodoApp = () => {
   // Delete task
   const deleteTask = async (taskId) => {
     try {
-      await axios.delete(`${TASKS_SERVICE_URL}/tasks/${taskId}`);
+      await axios.delete(`${TASKS_SERVICE_URL}/${taskId}`);
       setTasks((prev) => prev.filter((task) => task.id !== taskId));
     } catch (error) {
       console.error("Error deleting task:", error);
@@ -225,7 +225,7 @@ const TodoApp = () => {
   // Toggle task completion
   const toggleTaskCompletion = async (taskId) => {
     try {
-      const response = await axios.patch(`${TASKS_SERVICE_URL}/tasks/${taskId}/toggle`);
+      const response = await axios.patch(`${TASKS_SERVICE_URL}/${taskId}/toggle`);
       setTasks((prev) =>
         prev.map((task) => (task.id === taskId ? response.data : task))
       );
@@ -282,7 +282,7 @@ const TodoApp = () => {
       // Obtener la tarea actualizada con toda la información de colaboradores
       console.log("Fetching collaborators for task", task);
       const response = await axios.get(
-        `${COLLABORATOR_SERVICE_URL}/tasks/${task.id}/collaborators`
+        `${COLLABORATOR_SERVICE_URL}/${task.id}`
       );
       console.log("Collaborators response:", response);
       // Actualizar la tarea con toda la información recibida
@@ -308,13 +308,13 @@ const TodoApp = () => {
     try {
       // Llamada al servicio de colaboradores
       await axios.post(
-        `${COLLABORATOR_SERVICE_URL}/tasks/${shareTask.id}/collaborators`,
+        `${COLLABORATOR_SERVICE_URL}/${shareTask.id}`,
         { email: shareUid }
       );
 
       // Obtener los colaboradores actualizados
       const collabResponse = await axios.get(
-        `${COLLABORATOR_SERVICE_URL}/tasks/${shareTask.id}/collaborators`
+        `${COLLABORATOR_SERVICE_URL}/${shareTask.id}`
       );
 
       // // Obtener la tarea completa para tener toda la información actualizada
@@ -359,14 +359,14 @@ const TodoApp = () => {
     try {
       // Eliminar el colaborador
       await axios.delete(
-        `${COLLABORATOR_SERVICE_URL}/tasks/${shareTask.id}/collaborators/${encodeURIComponent(
+        `${COLLABORATOR_SERVICE_URL}/${shareTask.id}/collaborators/${encodeURIComponent(
           identifier
         )}`
       );
 
       // Obtener los colaboradores actualizados
       const collabResponse = await axios.get(
-        `${COLLABORATOR_SERVICE_URL}/tasks/${shareTask.id}/collaborators`
+        `${COLLABORATOR_SERVICE_URL}/${shareTask.id}`
       );
 
       // // Obtener la tarea completa para tener toda la información actualizada

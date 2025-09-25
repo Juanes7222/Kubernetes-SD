@@ -429,7 +429,7 @@ spec:
               number: 8001
 
       # Collaborator Service
-      - path: /api/collaborator
+      - path: /api/collaborators
         pathType: Prefix
         backend:
           service:

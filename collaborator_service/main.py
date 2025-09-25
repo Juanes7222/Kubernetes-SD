@@ -22,7 +22,7 @@ app.add_middleware(
 )
 
 # Incluir routers
-app.include_router(collaborators.router, prefix="/api/tasks")
+app.include_router(collaborators.router, prefix="/api/collaborators", tags=["collaborators"])
 
 @app.get("/health")
 async def health_check():

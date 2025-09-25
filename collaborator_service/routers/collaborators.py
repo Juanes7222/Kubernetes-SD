@@ -9,7 +9,7 @@ from core.logging_config import write, get_logger
 logger = get_logger(__name__)
 router = APIRouter(tags=["collaborators"])
 
-@router.post("/{task_id}/collaborators", response_model=CollaboratorResponse)
+@router.post("/{task_id}", response_model=CollaboratorResponse)
 async def add_collaborator(
     task_id: str,
     collab_data: CollaboratorCreate,
@@ -80,7 +80,7 @@ async def remove_collaborator(
     
     return result
 
-@router.get("/{task_id}/collaborators", response_model=CollaboratorResponse)
+@router.get("/{task_id}", response_model=CollaboratorResponse)
 async def get_collaborators(
     task_id: str,
     credentials: HTTPAuthorizationCredentials = Depends(security),
