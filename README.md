@@ -2,7 +2,7 @@
 
 This guide provides step-by-step instructions to deploy your microservices architecture to Kubernetes.
 
-## 🏗️ Architecture Overview
+## Architecture Overview
 
 Your application consists of the following microservices:
 
@@ -13,7 +13,7 @@ Your application consists of the following microservices:
 - **Collaborator Service**: Collaborator management service (port 8002)
 - **Logs Service**: Logging service (port 8003)
 
-## 📋 Prerequisites
+## Prerequisites
 
 Before deploying, ensure you have the following installed:
 
@@ -40,7 +40,7 @@ Before deploying, ensure you have the following installed:
    minikube addons enable ingress
    ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ### 1. Clone and Navigate to Project
 ```powershell
@@ -172,7 +172,7 @@ kubectl apply -f k8s/frontend-deployment.yaml
 kubectl apply -f k8s/ingress.yaml
 ```
 
-## 📊 Monitoring and Management
+## Monitoring and Management
 
 ### Check Deployment Status
 ```powershell
@@ -204,7 +204,7 @@ kubectl scale deployment auth-service --replicas=3 -n microservices-app
 kubectl scale deployment backend-service --replicas=3 -n microservices-app
 ```
 
-## 🛠️ Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
@@ -256,54 +256,4 @@ kubectl delete namespace microservices-app
 To remove Docker images:
 ```powershell
 docker rmi auth-service:latest backend-service:latest tasks-service:latest collaborator-service:latest logs-service:latest frontend:latest
-```
-
-## 🌐 Production Considerations
-
-For production deployment, consider:
-
-1. **Environment Variables**: Use ConfigMaps and Secrets
-2. **Resource Limits**: Set appropriate CPU and memory limits
-3. **Persistent Storage**: Use PersistentVolumes for databases
-4. **SSL/TLS**: Configure HTTPS with cert-manager
-5. **Monitoring**: Add Prometheus and Grafana
-6. **Backup**: Implement backup strategies for data
-7. **Security**: Use network policies and security contexts
-
-## 📝 Environment Configuration
-
-Create environment-specific configurations:
-
-### Development
-- Single replica per service
-- No resource limits
-- Debug logging enabled
-
-### Staging
-- 2 replicas per service
-- Moderate resource limits
-- Standard logging
-
-### Production
-- 3+ replicas per service
-- Strict resource limits
-- Minimal logging
-- Health checks and monitoring
-
-## 🔗 Useful Commands
-
-```powershell
-# Port forward to access services directly
-kubectl port-forward svc/auth-service 8000:8000 -n microservices-app
-kubectl port-forward svc/backend-service 8080:8080 -n microservices-app
-kubectl port-forward svc/frontend 80:80 -n microservices-app
-
-# Get ingress IP
-kubectl get ingress -n microservices-app -o wide
-
-# Watch pod status
-kubectl get pods -n microservices-app -w
-
-# Get events
-kubectl get events -n microservices-app --sort-by='.lastTimestamp'
 ```
