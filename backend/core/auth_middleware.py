@@ -23,7 +23,7 @@ async def get_current_user(
     token = credentials.credentials
 
     # Verify Firebase token
-    user_data = firebase_auth_service.verify_token(token)
+    user_data = await firebase_auth_service.verify_token(token)
 
     if not user_data:
         raise HTTPException(
@@ -43,4 +43,4 @@ async def get_optional_user(
     if not credentials:
         return None
 
-    return firebase_auth_service.verify_token(credentials.credentials)
+    return await firebase_auth_service.verify_token(credentials.credentials)

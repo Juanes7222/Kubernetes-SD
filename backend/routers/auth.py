@@ -12,8 +12,8 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 logger = get_logger(__name__)
 
 
-def get_current_user_info(current_user: Dict[str, Any] = Depends(get_current_user)):
-    user_info = firebase_auth_service.get_user_by_uid(current_user["uid"])
+async def get_current_user_info(current_user: Dict[str, Any] = Depends(get_current_user)):
+    user_info = await firebase_auth_service.get_user_by_uid(current_user["uid"])
     if not user_info:
         raise HTTPException(status_code=404, detail="User not found")
     logger.info("get_current_user_info: user=%s", current_user.get("email") or current_user.get("uid"))
@@ -21,9 +21,9 @@ def get_current_user_info(current_user: Dict[str, Any] = Depends(get_current_use
 
 
 @router.get("/users/{uid}", response_model=User)
-def get_user_by_uid(uid: str, current_user: Dict[str, Any] = Depends(get_current_user)):
+async def get_user_by_uid(uid: str, current_user: Dict[str, Any] = Depends(get_current_user)):
     """Return basic user info (uid, email, display_name) for a given UID."""
-    user_info = firebase_auth_service.get_user_by_uid(uid)
+    user_info = await firebase_auth_service.get_user_by_uid(uid)
     if not user_info:
         raise HTTPException(status_code=404, detail="User not found")
     logger.info("get_user_by_uid: requested uid=%s by=%s", uid, current_user.get("uid"))

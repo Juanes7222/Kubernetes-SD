@@ -1,108 +1,173 @@
-# Kubernetes-SD
+# Kubernetes Service Discovery
 
-Proyecto académico para la asignatura de Sistemas Distribuidos, orientado al desarrollo de un sistema monolítico para la gestión de tareas (To-Do) colaborativo. El backend fue desarrollado con FastAPI, integrando los servicios de Cloud Firestore para la base de datos y Firebase Authentication para la gestión de usuarios, capaz de soportar tanto las credenciales de Google como la autenticación mediante correo electrónico y contraseña. El frontend fue implementado utilizando React (CRA + Tailwind) para la interfaz de usuario.
+Una aplicación moderna de gestión de tareas y registro de servicios construida con React (frontend) y FastAPI (backend).
 
-## Requisitos
+## 🚀 Características
 
-### backend
-- Python 3.10+
-- FastAPI
-- Uvicorn
-- Firebase Admin SDK
-- Credenciales de Firebase (archivo JSON)
-- Dependencias adicionales definidas en requirements.txt
+### Gestión de Tareas
+- ✅ Crear, editar y eliminar tareas
+- ✅ Marcar tareas como completadas
+- ✅ Filtrar tareas (propias, colaborativas, todas)
+- ✅ Buscar tareas por título o descripción
+- ✅ Colaboración entre usuarios
+- ✅ Fechas de vencimiento con alertas visuales
+- ✅ Autenticación con Firebase
 
-### frontend
-- Node.js 16+
-- Yarn o npm
-- React
-- Tailwind CSS
-- Dependencias adicionales definidas en package.json
+### Service Registry (Nuevo)
+- 🆕 Registrar servicios con información detallada
+- 🆕 Health checks automáticos
+- 🆕 Filtrado por tags y status
+- 🆕 Configuración de service discovery
+- 🆕 Soporte para múltiples protocolos (HTTP, HTTPS, TCP, gRPC)
+- 🆕 Interfaz web intuitiva
 
-## Estructura relevante
-El proyecto se divide en dos módulos principales:
-- **backend**: Concentra la lógica del servidor, integra los servicios de Firebase y define los endpoints.
-- **frontend**: Contiene la interfaz de usuario y se conecta con el backend.
+## 🏗️ Arquitectura
 
-Estructura de carpetas y archivos más relevantes:
-
-```plaintext
-Kubernetes-SD/
-├── backend/
-│   ├── auth_middleware.py
-│   ├── firebase_service.py
-│   ├── requirements.txt
-│   └── server.py
-│
-└── frontend/
-    ├── src/
-    │   ├── App.js
-    │   ├── components/Auth/
-    │   │   ├── LoginForms.js
-    │   │   └── SignupForm.js
-    │   ├── contexts/
-    │   │   └── AuthContext.js
-    │   └── lib/
-    │       └── utils.js
-    ├── package-lock.json
-    └── package.json
 ```
-## Configuración Adicional
-1. Firebase
-   - Coloca el archivo de credenciales del servicio en `backend/kubernetes-sd.json` (ruta usada por el admin SDK).
-   - Si no se proporciona, el servidor arrancará en modo "mock" (ver `firebase_available` en [backend/server.py](backend/server.py)).
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Frontend      │    │   Backend       │    │   Firebase      │
+│   (React)       │◄──►│   (FastAPI)     │◄──►│   (Auth & DB)   │
+│                 │    │                 │    │                 │
+│ • Service UI    │    │ • Service API   │    │ • Authentication│
+│ • Task UI       │    │ • Task API      │    │ • Firestore     │
+│ • Auth UI       │    │ • Auth API      │    │                 │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+```
 
-2. Variables de entorno
-   - Backend: crea `backend/.env` con, por ejemplo:
-     - CORS_ORIGINS=http://localhost:3000
-   - Frontend: crea `frontend/.env` con, por ejemplo:
-     - REACT_APP_BACKEND_URL=http://localhost:8001
-     - REACT_APP_POSTHOG_KEY=  (opcional)
+## 🛠️ Tecnologías
 
-## Instalación y ejecución
-### Backend (FastAPI)
+### Frontend
+- **React** - Biblioteca de UI
+- **Tailwind CSS** - Framework de CSS
+- **shadcn/ui** - Componentes de UI
+- **Lucide React** - Iconos
+- **Axios** - Cliente HTTP
+
+### Backend
+- **FastAPI** - Framework web moderno y rápido
+- **Python 3.9+** - Lenguaje de programación
+- **Firebase Admin SDK** - Autenticación y base de datos
+- **Pydantic** - Validación de datos
+- **aiohttp** - Cliente HTTP asíncrono
+- **aiofiles** - Operaciones de archivos asíncronas
+
+## 📦 Instalación
+
+### Prerrequisitos
+- Node.js 16+
+- Python 3.9+
+- Cuenta de Firebase
+
+### Backend
 ```bash
-# Desde la raíz del proyecto
 cd backend
 
-# Crea y activa entorno virtual (en este ejemplo se nombra como .venv)
-python -m venv .venv
+# Crear entorno virtual
+python -m venv venv
+source venv/bin/activate  # En Windows: venv\Scripts\activate
 
-   # Windows
-   .venv\Scripts\activate
-
-   # Unix / macOS
-   source .venv/bin/activate
-
-# Instala las dependencias adicionales
+# Instalar dependencias
 pip install -r requirements.txt
 
-# Inicia el servidor
-   # Opción 1: ejecuta con uvicorn (recomendado)
-   uvicorn server:app --reload --host 0.0.0.0 --port 8001
-   
-   # Opción 2: ejecuta directamente (tiene guardia __main__)
-   python server.py
+# Configurar Firebase
+# 1. Crear proyecto en Firebase Console
+# 2. Descargar el archivo de credenciales JSON
+# 3. Colocarlo en secrets/kubernetes-sd.json
+
+# Ejecutar servidor
+uvicorn main:app --reload --port 8000
 ```
 
-- Endpoint base: http://localhost:8001/api
-- Ruta de comprobación de estado: http://localhost:8001/api/health
-- **Autenticación:** las rutas protegidas usan el header `Authorization: Bearer <ID_TOKEN>` (ver [`get_current_user`](backend/auth_middleware.py)).
-
-### Frontend (React)
+### Frontend
 ```bash
-# Desde la raíz del proyecto
 cd frontend
 
-# Instala las dependencias requeridas
-   # Opción 1: Usa yarn (recomendado según package.json)
-   yarn install
-   yarn start
-   
-   # Opción 2: Usa npm
-   npm install
-   npm run start
+# Instalar dependencias
+npm install
+
+# Configurar variables de entorno
+cp .env.example .env
+# Editar .env con tus configuraciones de Firebase
+
+# Ejecutar aplicación
+npm start
 ```
 
-- Asegúrese de que `REACT_APP_BACKEND_URL` en `frontend/.env` apunte a tu backend (por defecto http://localhost:8001).
-- El cliente añade el token a las peticiones (ver [AuthContext.js](frontend/src/contexts/AuthContext.js)).
+## 📚 API Endpoints
+
+### Autenticación
+- `GET /api/auth/users/{uid}` - Obtener información de usuario
+
+### Tareas
+- `GET /api/tasks` - Listar tareas
+- `POST /api/tasks` - Crear tarea
+- `GET /api/tasks/{task_id}` - Obtener tarea
+- `PUT /api/tasks/{task_id}` - Actualizar tarea
+- `DELETE /api/tasks/{task_id}` - Eliminar tarea
+- `PATCH /api/tasks/{task_id}/toggle` - Cambiar estado de completado
+- `POST /api/tasks/{task_id}/collaborators` - Agregar colaborador
+- `DELETE /api/tasks/{task_id}/collaborators/{uid}` - Remover colaborador
+
+### Service Registry (Nuevo)
+- `GET /api/services/` - Listar todos los servicios
+- `POST /api/services/register` - Registrar nuevo servicio
+- `GET /api/services/{service_name}` - Obtener servicio específico
+- `PUT /api/services/{service_name}` - Actualizar servicio
+- `DELETE /api/services/{service_name}` - Eliminar servicio
+- `GET /api/services/tag/{tag}` - Filtrar por tag
+- `POST /api/services/health-check` - Ejecutar health check
+- `GET /api/services/discovery/config` - Generar configuración de service discovery
+
+## 🚀 Mejoras de Rendimiento
+
+### Backend Asíncrono
+Se han convertido todas las operaciones a asíncronas para mejorar el rendimiento:
+
+- ✅ **Firebase Auth**: Operaciones de autenticación asíncronas
+- ✅ **Firebase Firestore**: Consultas de base de datos asíncronas
+- ✅ **Service Registry**: Operaciones de archivo y health checks asíncronos
+- ✅ **HTTP Requests**: Cliente aiohttp para requests no bloqueantes
+
+### Beneficios:
+- **Mejor escalabilidad**: Manejo de múltiples requests concurrentes
+- **Menor latencia**: Operaciones no bloqueantes
+- **Eficiencia de recursos**: Mejor uso de CPU y memoria
+
+## 📊 Service Discovery
+
+### Ejemplo de Configuración Generada
+```json
+{
+  "version": "1.0",
+  "generated_at": "2024-10-04T15:30:00Z",
+  "total_services": 3,
+  "services": {
+    "api-gateway": {
+      "name": "api-gateway",
+      "host": "gateway.example.com",
+      "port": 8080,
+      "protocol": "https",
+      "status": "active",
+      "url": "https://gateway.example.com:8080",
+      "tags": ["gateway", "production"]
+    }
+  },
+  "by_tag": {
+    "production": ["api-gateway"],
+    "database": ["postgres-main"]
+  },
+  "by_protocol": {
+    "https": ["api-gateway"],
+    "tcp": ["postgres-main"]
+  }
+}
+```
+
+## 🔄 Roadmap
+
+- [ ] Migrar service registry a base de datos
+- [ ] Agregar métricas y monitoreo
+- [ ] Implementar webhooks para notificaciones
+- [ ] Soporte para service mesh (Istio, Linkerd)
+- [ ] API GraphQL
+- [ ] Dashboard de analytics

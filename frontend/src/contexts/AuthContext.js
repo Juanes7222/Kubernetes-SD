@@ -39,13 +39,23 @@ export const AuthProvider = ({ children }) => {
   };
 
   // Sign in function
-  const login = (email, password) => {
-    return signInWithEmailAndPassword(auth, email, password);
+  const login = async (email, password) => {
+    try {
+      return await signInWithEmailAndPassword(auth, email, password);
+    } catch (error) {
+      console.error('Login error:', error);
+      throw error;
+    }
   };
 
   // Google sign in function
-  const loginWithGoogle = () => {
-    return signInWithPopup(auth, googleProvider);
+  const loginWithGoogle = async () => {
+    try {
+      return await signInWithPopup(auth, googleProvider);
+    } catch (error) {
+      console.error('Google login error:', error);
+      throw error;
+    }
   };
 
   // Sign out function

@@ -23,15 +23,30 @@ def to_firestore_dates(data: dict) -> dict:
 
 def from_firestore_dates(data: dict) -> dict:
     """
-    Convierte cadenas ISO en date (si aplica). No falla si el formato es inesperado.
+    Convierte cadenas ISO o DatetimeWithNanoseconds en date (si aplica). 
+    No falla si el formato es inesperado.
     """
     if not data:
         return data
     if data.get("due_date"):
         try:
-            data["due_date"] = datetime.fromisoformat(data["due_date"]).date()
-        except Exception:
-            logger.debug("No se pudo parsear due_date: %s", data.get("due_date"))
+            due_date_value = data["due_date"]
+            
+            # Si ya es un objeto date, dejarlo como está
+            if isinstance(due_date_value, date) and not isinstance(due_date_value, datetime):
+                return data
+            
+            # Si es un datetime (incluyendo DatetimeWithNanoseconds de Firebase)
+            if isinstance(due_date_value, datetime):
+                data["due_date"] = due_date_value.date()
+            # Si es string ISO
+            elif isinstance(due_date_value, str):
+                data["due_date"] = datetime.fromisoformat(due_date_value).date()
+            else:
+                logger.debug("Tipo inesperado para due_date: %s", type(due_date_value))
+                data["due_date"] = None
+        except Exception as e:
+            logger.debug("No se pudo parsear due_date: %s - Error: %s", data.get("due_date"), e)
             data["due_date"] = None
     return data
 

@@ -1,5 +1,5 @@
 from fastapi import FastAPI, Request
-from routers import tasks, auth, logs
+from routers import tasks, auth, logs, services
 from starlette.middleware.cors import CORSMiddleware
 from core.config import settings
 from core.logging_config import get_logger, request_log, write
@@ -19,6 +19,23 @@ app = FastAPI(
 @app.on_event("startup")
 async def startup_event():
     logger.info("Starting backend: %s version=%s", settings.PROJECT_NAME, settings.VERSION)
+    # Inicializar service registry
+    from services.service_registry import service_registry
+    await service_registry.initialize()
+    
+    # Auto-registrar el backend API
+    try:
+        await service_registry.register_service({
+            "name": "todo-backend-api",
+            "host": "localhost",
+            "port": 8001,
+            "protocol": "http",
+            "health_check_url": "http://localhost:8001/health",
+            "tags": ["api", "backend", "todo", "fastapi"]
+        })
+        logger.info("Backend API auto-registered in service registry")
+    except Exception as e:
+        logger.warning("Failed to auto-register backend API: %s", e)
 
 
 @app.middleware("http")
@@ -40,6 +57,7 @@ async def log_requests(request: Request, call_next):
 app.include_router(auth.router, prefix="/api")
 app.include_router(tasks.router, prefix="/api")
 app.include_router(logs.router, prefix="/api")
+app.include_router(services.router, prefix="/api")
 
 # CORS
 app.add_middleware(
@@ -56,3 +74,11 @@ async def root():
     # Emit a root hit log so we can validate logging from requests
     write("info", "root_ping", name=__name__)
     return {"message": f"{settings.PROJECT_NAME} is running!"}
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy", "version": settings.VERSION}
+
+@app.get("/api/health")
+async def api_health_check():
+    return {"status": "healthy", "version": settings.VERSION, "api": "ready"}

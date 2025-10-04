@@ -10,6 +10,39 @@ class User(BaseModel):
     display_name: Optional[str] = None
     email_verified: bool = False
 
+# Service Registry Models
+class ServiceRegistry(BaseModel):
+    id: Optional[str] = None
+    name: str
+    host: str
+    port: int
+    protocol: str = "http"
+    health_check_url: Optional[str] = None
+    tags: List[str] = []
+    status: str = "active"  # active, inactive, maintenance
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
+
+class ServiceRegistryResponse(BaseModel):
+    services: List[ServiceRegistry]
+    total: int
+
+class ServiceRegistryCreate(BaseModel):
+    name: str
+    host: str
+    port: int
+    protocol: str = "http"
+    health_check_url: Optional[str] = None
+    tags: List[str] = []
+
+class ServiceRegistryUpdate(BaseModel):
+    host: Optional[str] = None
+    port: Optional[int] = None
+    protocol: Optional[str] = None
+    health_check_url: Optional[str] = None
+    tags: Optional[List[str]] = None
+    status: Optional[str] = None
+
 class CollaboratorIn(BaseModel):
     # Permitir enviar uid o email para identificar al colaborador
     uid: Optional[str] = None

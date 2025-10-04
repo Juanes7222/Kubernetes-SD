@@ -1,10 +1,11 @@
 import firebase_admin
 import os
 from firebase_admin import credentials, firestore, auth
+from firebase_admin import _auth_utils
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 from fastapi import HTTPException
-from core.utils import to_firestore_dates, get_path_credentials
+from core.utils import to_firestore_dates, from_firestore_dates, get_path_credentials
 from core.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -26,19 +27,24 @@ class FirebaseAuthService:
     """Service for Firebase Authentication"""
     
     @staticmethod
-    def verify_token(token: str) -> Optional[Dict[str, Any]]:
+    async def verify_token(token: str) -> Optional[Dict[str, Any]]:
         """Verify Firebase ID token and return user info"""
         try:
-            return auth.verify_id_token(token)
+            # Firebase auth operations are CPU-bound, so we run them in a thread pool
+            import asyncio
+            loop = asyncio.get_event_loop()
+            return await loop.run_in_executor(None, auth.verify_id_token, token)
         except Exception as e:
             logger.exception(f"Token verification failed: {e}")
             return None
     
     @staticmethod
-    def get_user_by_uid(uid: str) -> Optional[Dict[str, Any]]:
+    async def get_user_by_uid(uid: str) -> Optional[Dict[str, Any]]:
         """Get user information by UID"""
         try:
-            user = auth.get_user(uid)
+            import asyncio
+            loop = asyncio.get_event_loop()
+            user = await loop.run_in_executor(None, auth.get_user, uid)
             return {
                 'uid': user.uid,
                 'email': user.email,
@@ -48,15 +54,25 @@ class FirebaseAuthService:
                 'created_at': user.user_metadata.creation_timestamp,
                 'last_sign_in': user.user_metadata.last_sign_in_timestamp
             }
+        except _auth_utils.UserNotFoundError:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"No se encontró ningún usuario con el UID: {uid}"
+            )
         except Exception as e:
             logger.exception(f"Get user failed: {e}")
-            return None
+            raise HTTPException(
+                status_code=500,
+                detail="Error al buscar usuario en Firebase"
+            )
     
     @staticmethod
-    def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
+    async def get_user_by_email(email: str) -> Optional[Dict[str, Any]]:
         """Get user information by email"""
         try:
-            user = auth.get_user_by_email(email)
+            import asyncio
+            loop = asyncio.get_event_loop()
+            user = await loop.run_in_executor(None, auth.get_user_by_email, email)
             return {
                 'uid': user.uid,
                 'email': user.email,
@@ -66,9 +82,17 @@ class FirebaseAuthService:
                 'created_at': user.user_metadata.creation_timestamp,
                 'last_sign_in': user.user_metadata.last_sign_in_timestamp
             }
+        except _auth_utils.UserNotFoundError:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"No se encontró ningún usuario con el correo: {email}"
+            )
         except Exception as e:
             logger.exception(f"Get user by email failed: {e}")
-            return None
+            raise HTTPException(
+                status_code=500,
+                detail="Error al buscar usuario en Firebase"
+            )
 
 
 class FirebaseTaskService:
@@ -76,7 +100,7 @@ class FirebaseTaskService:
         self.collection = db.collection('tasks')
 
 
-    def _enrich_collaborators(self, task: Dict[str, Any]) -> Dict[str, Any]:
+    async def _enrich_collaborators(self, task: Dict[str, Any]) -> Dict[str, Any]:
         """Resolve collaborator UIDs to basic user info to return to clients."""
         collaborators = task.get("collaborators") or []
         if not collaborators:
@@ -97,13 +121,23 @@ class FirebaseTaskService:
             if uid in cache:
                 resolved.append(cache[uid])
                 continue
-                
-            info = FirebaseAuthService.get_user_by_uid(uid)
-            entry = {
-                "uid": info.get("uid") if info else uid,
-                "email": info.get("email") if info else None,
-                "display_name": info.get("display_name") if info else None,
-            }
+            
+            # Intentar obtener información del usuario, pero continuar si no existe
+            try:
+                info = await FirebaseAuthService.get_user_by_uid(uid)
+                entry = {
+                    "uid": info.get("uid"),
+                    "email": info.get("email"),
+                    "display_name": info.get("display_name"),
+                }
+            except HTTPException:
+                # Usuario no existe o error - usar solo el UID
+                logger.warning(f"_enrich_collaborators: user not found for uid {uid}")
+                entry = {
+                    "uid": uid,
+                    "email": None,
+                    "display_name": None,
+                }
             
             # Solo agregar si tenemos un uid válido
             if entry["uid"]:
@@ -113,14 +147,19 @@ class FirebaseTaskService:
         task["collaborators"] = resolved
         return task
     
-    def _enrich_owner(self, task: Dict[str, Any]) -> Dict[str, Any]:
+    async def _enrich_owner(self, task: Dict[str, Any]) -> Dict[str, Any]:
         """
         Add basic information about the owner of the task
         """
         owner_id = task.get("owner_id") or task.get("user_id")
         
         if isinstance(owner_id, str) and owner_id:
-            owner_info = FirebaseAuthService.get_user_by_uid(owner_id)
+            try:
+                owner_info = await FirebaseAuthService.get_user_by_uid(owner_id)
+            except HTTPException:
+                # Owner no existe - usar solo el UID
+                logger.warning(f"_enrich_owner: owner not found for uid {owner_id}")
+                owner_info = None
         else:
             owner_info = None
         
@@ -131,29 +170,24 @@ class FirebaseTaskService:
         }
         return task
     
-    def _enrich_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
+    async def _enrich_task(self, task: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Enriches collaborators, owner
+        Enriches collaborators, owner, and converts Firestore dates
         """
-        task = self._enrich_collaborators(task)
-        task = self._enrich_owner(task)
+        task = from_firestore_dates(task)  # Convertir dates de Firestore
+        task = await self._enrich_collaborators(task)
+        task = await self._enrich_owner(task)
         return task
     
-    def _enrich_task_for_user(self, task: Dict[str, Any], user_id: str) -> Dict[str, Any]:
+    async def _enrich_task_for_user(self, task: Dict[str, Any], user_id: str) -> Dict[str, Any]:
         """
-        Enriches task with user-specific information like who invited them
+        Enriches task with user-specific information
         """
-        task = self._enrich_task(task)
-        
-        # Agregar información de quién invitó al usuario actual si es colaborador
-        collaborator_invites = task.get("collaborator_invites", {})
-        if user_id in collaborator_invites:
-            task["invited_by"] = collaborator_invites[user_id]
-        
+        task = await self._enrich_task(task)
         return task
 
 
-    def create_task(self, task_data: Dict[str, Any], user_id: str) -> Dict[str, Any]:
+    async def create_task(self, task_data: Dict[str, Any], user_id: str) -> Dict[str, Any]:
         """Create a new task for a specific user"""
         task_data = to_firestore_dates(task_data)
         # Guardar owner_id para soporte de colaboración
@@ -165,9 +199,9 @@ class FirebaseTaskService:
         doc_ref = self.collection.document()
         doc_ref.set(task_data)
         task_data["id"] = doc_ref.id
-        return self._enrich_task(task_data)
+        return await self._enrich_task(task_data)
     
-    def get_tasks(
+    async def get_tasks(
         self,
         user_id: str,
         search: Optional[str] = None,
@@ -216,7 +250,8 @@ class FirebaseTaskService:
                 ):
                     continue
 
-            tasks.append(self._enrich_task_for_user(task, user_id))
+            enriched_task = await self._enrich_task_for_user(task, user_id)
+            tasks.append(enriched_task)
 
         logger.info(f"get_tasks: returning {len(tasks)} tasks after deduplication for user {user_id}")
         tasks.sort(
@@ -225,7 +260,7 @@ class FirebaseTaskService:
         )
         return tasks
     
-    def get_task_by_id(self, task_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+    async def get_task_by_id(self, task_id: str, user_id: str) -> Optional[Dict[str, Any]]:
         """Get a single task by ID for a specific user"""
         doc = self.collection.document(task_id).get()
         if not doc.exists:
@@ -242,9 +277,9 @@ class FirebaseTaskService:
             logger.info("get_task_by_id: access denied task_id=%s user=%s owner=%s", task_id, user_id, owner)
             return None
         task["id"] = doc.id
-        return self._enrich_task_for_user(task, user_id)
+        return await self._enrich_task_for_user(task, user_id)
     
-    def update_task(self, task_id: str, user_id: str, update_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    async def update_task(self, task_id: str, user_id: str, update_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Update a task for a specific user"""
         update_data = to_firestore_dates(update_data)
         doc_ref = self.collection.document(task_id)
@@ -264,9 +299,9 @@ class FirebaseTaskService:
         if not updated_task:
             return None
         updated_task["id"] = doc_ref.id
-        return self._enrich_task_for_user(updated_task, user_id)
+        return await self._enrich_task_for_user(updated_task, user_id)
     
-    def delete_task(self, task_id: str, user_id: str) -> bool:
+    async def delete_task(self, task_id: str, user_id: str) -> bool:
         """Delete a task for a specific user"""
         doc_ref = self.collection.document(task_id)
         doc = doc_ref.get()
@@ -282,7 +317,7 @@ class FirebaseTaskService:
         doc_ref.delete()
         return True
     
-    def toggle_task_completion(self, task_id: str, user_id: str) -> Optional[Dict[str, Any]]:
+    async def toggle_task_completion(self, task_id: str, user_id: str) -> Optional[Dict[str, Any]]:
         """Toggle task completion status for a specific user"""
         doc_ref = self.collection.document(task_id)
         doc = doc_ref.get()
@@ -296,16 +331,21 @@ class FirebaseTaskService:
             logger.info("toggle_task_completion: permission denied task_id=%s user=%s owner=%s", task_id, user_id, owner)
             return None
         new_status = not task.get("completed", False)
-        doc_ref.update({"completed": new_status})
+        due_date = task.get("due_date")
+        if new_status:
+            due_date = datetime.now(timezone.utc)
+        else:
+            due_date = None
+        doc_ref.update({"completed": new_status, "due_date": due_date})
         updated_task = doc_ref.get().to_dict()
         if not updated_task:
             return None
         updated_task["id"] = doc_ref.id
-        return self._enrich_task_for_user(updated_task, user_id)
+        return await self._enrich_task_for_user(updated_task, user_id)
 
     # ---------------------------- Métodos para gestionar colaboradores ---------------------------- #
 
-    def add_collaborator(self, task_id: str, owner_id: str, collaborator: str) -> Optional[Dict[str, Any]]:
+    async def add_collaborator(self, task_id: str, owner_id: str, collaborator: str) -> Optional[Dict[str, Any]]:
         doc_ref = self.collection.document(task_id)
         doc = doc_ref.get()
         task = doc.to_dict() if doc else None
@@ -313,49 +353,30 @@ class FirebaseTaskService:
             # Solo el propietario puede invitar colaboradores
             return None
         
-        # Obtener información del propietario que está agregando
-        owner_info = FirebaseAuthService.get_user_by_uid(owner_id)
-        
         collaborators = task.get("collaborators", [])
-        collaborator_invites = task.get("collaborator_invites", {})
         
         # Si el 'collaborator' contiene '@' tratamos como email y resolvemos a uid
         collaborator_uid = collaborator
         if "@" in collaborator:
-            user_info = FirebaseAuthService.get_user_by_email(collaborator)
-            if not user_info:
-                # Usuario no existe
-                return None
+            # get_user_by_email lanzará HTTPException si no existe
+            user_info = await FirebaseAuthService.get_user_by_email(collaborator)
             collaborator_uid = user_info['uid']
         else:
-            # Validar que el UID exista
-            user_info = FirebaseAuthService.get_user_by_uid(collaborator_uid)
-            if not user_info:
-                return None
+            # Validar que el UID exista - lanzará HTTPException si no existe
+            user_info = await FirebaseAuthService.get_user_by_uid(collaborator_uid)
         
         if collaborator_uid not in collaborators:
             collaborators.append(collaborator_uid)
-            # Guardar quién invitó a este colaborador
-            collaborator_invites[collaborator_uid] = {
-                "invited_by_uid": owner_id,
-                "invited_by_email": owner_info.get("email") if owner_info else None,
-                "invited_by_name": owner_info.get("display_name") if owner_info else None,
-                "invited_at": datetime.now(timezone.utc).isoformat()
-            }
-            
-            doc_ref.update({
-                "collaborators": collaborators,
-                "collaborator_invites": collaborator_invites
-            })
+            doc_ref.update({"collaborators": collaborators})
         
         updated_task = doc_ref.get().to_dict()
         if not updated_task:
             return None
         updated_task["id"] = doc_ref.id
         logger.info(f"add_collaborator: task_id={task_id} owner_id={owner_id} added={collaborator_uid} collaborators={collaborators}")
-        return self._enrich_task(updated_task)
+        return await self._enrich_task(updated_task)
 
-    def remove_collaborator(self, task_id: str, owner_id: str, collaborator_uid: str) -> Optional[Dict[str, Any]]:
+    async def remove_collaborator(self, task_id: str, owner_id: str, collaborator_uid: str) -> Optional[Dict[str, Any]]:
         doc_ref = self.collection.document(task_id)
         doc = doc_ref.get()
         task = doc.to_dict() if doc else None
@@ -366,10 +387,8 @@ class FirebaseTaskService:
         # Permitir pasar email o uid para remover
         to_remove = collaborator_uid
         if "@" in collaborator_uid:
-            user_info = FirebaseAuthService.get_user_by_email(collaborator_uid)
-            if not user_info:
-                logger.info(f"remove_collaborator: no user found for email {collaborator_uid}")
-                return None
+            # get_user_by_email lanzará HTTPException si no existe
+            user_info = await FirebaseAuthService.get_user_by_email(collaborator_uid)
             to_remove = user_info['uid']
 
         if to_remove in collaborators:
@@ -380,7 +399,7 @@ class FirebaseTaskService:
         if not updated_task:
             return None
         updated_task["id"] = doc_ref.id
-        return self._enrich_task(updated_task)
+        return await self._enrich_task(updated_task)
 
 # Create service instances
 firebase_auth_service = FirebaseAuthService()

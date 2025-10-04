@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import "./App.css";
 import axios from "axios";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import LoginForm from "./components/Auth/LoginForm";
 import SignupForm from "./components/Auth/SignupForm";
+import ServiceRegistry from "./components/ServiceRegistry/ServiceRegistry";
+import SystemStatus from "./components/SystemStatus/SystemStatus";
 import { Button } from "./components/ui/button";
 import { Input } from "./components/ui/input";
 import { Textarea } from "./components/ui/textarea";
@@ -16,6 +18,9 @@ import {
   DialogTrigger,
 } from "./components/ui/dialog";
 import { Badge } from "./components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "./components/ui/tabs";
+import { useToast } from "./hooks/use-toast";
+import { Toaster } from "./components/ui/toaster";
 import {
   Search,
   Plus,
@@ -26,6 +31,8 @@ import {
   Trash2,
   LogOut,
   User,
+  Server,
+  ListTodo,
 } from "lucide-react";
 import { format } from "date-fns";
 import logger from "./lib/logger";
@@ -65,6 +72,7 @@ const AuthPage = () => {
 
 const TodoApp = () => {
   const { user, logout, getIdToken } = useAuth();
+  const { toast } = useToast();
   const [tasks, setTasks] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [taskFilter, setTaskFilter] = useState("all"); // all, owned, collaborator, assigned
@@ -73,6 +81,8 @@ const TodoApp = () => {
   const [loading, setLoading] = useState(true);
   const [shareTask, setShareTask] = useState(null);
   const [shareUid, setShareUid] = useState("");
+  const [activeTab, setActiveTab] = useState("tasks"); // tasks, services
+  const currentUserUidRef = useRef(user?.uid); // Ref para rastrear el UID actual
   
 
   // Form states
@@ -81,6 +91,27 @@ const TodoApp = () => {
     description: "",
     due_date: "",
   });
+
+  // Helper function to extract error message from backend response
+  const getErrorMessage = (error) => {
+    if (error.response?.data?.detail) {
+      // FastAPI returns detail field
+      if (typeof error.response.data.detail === 'string') {
+        return error.response.data.detail;
+      }
+      // Sometimes detail is an array
+      if (Array.isArray(error.response.data.detail)) {
+        return error.response.data.detail.map(e => e.msg || e.message).join(', ');
+      }
+    }
+    if (error.response?.data?.message) {
+      return error.response.data.message;
+    }
+    if (error.message) {
+      return error.message;
+    }
+    return 'Ha ocurrido un error inesperado';
+  };
 
   // Update auth token when user changes
   useEffect(() => {
@@ -135,7 +166,10 @@ const TodoApp = () => {
         return t;
       });
 
-      setTasks(enriched);
+      // Solo actualizar tareas si el usuario no ha cambiado durante el fetch
+      if (currentUserUidRef.current === user?.uid) {
+        setTasks(enriched);
+      }
     } catch (error) {
       console.error("Error fetching tasks:", error);
       logger.error(
@@ -145,6 +179,17 @@ const TodoApp = () => {
       );
       if (error.response?.status === 401) {
         logout();
+        toast({
+          title: "Sesión expirada",
+          description: "Por favor, inicia sesión nuevamente",
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "❌ Error al cargar tareas",
+          description: getErrorMessage(error),
+          variant: "destructive"
+        });
       }
     } finally {
       setLoading(false);
@@ -155,9 +200,25 @@ const TodoApp = () => {
   const createTask = async (taskData) => {
     try {
       const response = await axios.post(`${API}/tasks`, taskData);
-      setTasks((prev) => [response.data, ...prev]);
+      const newTask = response.data;
+      
+      // Enriquecer la tarea con la información del owner (usuario actual)
+      if (user && (!newTask.owner || !newTask.owner.uid)) {
+        newTask.owner = {
+          uid: user.uid,
+          email: user.email,
+          display_name: user.displayName || user.email
+        };
+      }
+      
+      setTasks((prev) => [newTask, ...prev]);
       resetForm();
       setIsCreateDialogOpen(false);
+      
+      toast({
+        title: "✅ Tarea creada",
+        description: "La tarea se ha creado exitosamente"
+      });
     } catch (error) {
       console.error("Error creating task:", error);
       logger.error(
@@ -165,6 +226,12 @@ const TodoApp = () => {
         user?.email,
         { status: error?.response?.status }
       );
+      
+      toast({
+        title: "❌ Error al crear tarea",
+        description: getErrorMessage(error),
+        variant: "destructive"
+      });
     }
   };
 
@@ -172,11 +239,28 @@ const TodoApp = () => {
   const updateTask = async (taskId, updateData) => {
     try {
       const response = await axios.put(`${API}/tasks/${taskId}`, updateData);
+      const updatedTask = response.data;
+      
+      // Preservar o enriquecer la información del owner
       setTasks((prev) =>
-        prev.map((task) => (task.id === taskId ? response.data : task))
+        prev.map((task) => {
+          if (task.id === taskId) {
+            // Si la tarea actualizada no tiene owner info, preservar la anterior
+            if ((!updatedTask.owner || !updatedTask.owner.uid) && task.owner) {
+              updatedTask.owner = task.owner;
+            }
+            return updatedTask;
+          }
+          return task;
+        })
       );
       resetForm();
       setEditingTask(null);
+      
+      toast({
+        title: "✅ Tarea actualizada",
+        description: "Los cambios se han guardado correctamente"
+      });
     } catch (error) {
       console.error("Error updating task:", error);
       logger.error(
@@ -184,6 +268,12 @@ const TodoApp = () => {
         user?.email,
         { taskId, status: error?.response?.status }
       );
+      
+      toast({
+        title: "❌ Error al actualizar tarea",
+        description: getErrorMessage(error),
+        variant: "destructive"
+      });
     }
   };
 
@@ -192,6 +282,11 @@ const TodoApp = () => {
     try {
       await axios.delete(`${API}/tasks/${taskId}`);
       setTasks((prev) => prev.filter((task) => task.id !== taskId));
+      
+      toast({
+        title: "✅ Tarea eliminada",
+        description: "La tarea se ha eliminado correctamente"
+      });
     } catch (error) {
       console.error("Error deleting task:", error);
       logger.error(
@@ -199,6 +294,12 @@ const TodoApp = () => {
         user?.email,
         { taskId, status: error?.response?.status }
       );
+      
+      toast({
+        title: "❌ Error al eliminar tarea",
+        description: getErrorMessage(error),
+        variant: "destructive"
+      });
     }
   };
 
@@ -206,8 +307,19 @@ const TodoApp = () => {
   const toggleTaskCompletion = async (taskId) => {
     try {
       const response = await axios.patch(`${API}/tasks/${taskId}/toggle`);
+      const updatedTask = response.data;
+      
       setTasks((prev) =>
-        prev.map((task) => (task.id === taskId ? response.data : task))
+        prev.map((task) => {
+          if (task.id === taskId) {
+            // Preservar owner info si no viene en la respuesta
+            if ((!updatedTask.owner || !updatedTask.owner.uid) && task.owner) {
+              updatedTask.owner = task.owner;
+            }
+            return updatedTask;
+          }
+          return task;
+        })
       );
     } catch (error) {
       console.error("Error toggling task:", error);
@@ -216,6 +328,12 @@ const TodoApp = () => {
         user?.email,
         { taskId, status: error?.response?.status }
       );
+      
+      toast({
+        title: "❌ Error al cambiar estado",
+        description: getErrorMessage(error),
+        variant: "destructive"
+      });
     }
   };
 
@@ -269,14 +387,32 @@ const TodoApp = () => {
         `${API}/tasks/${shareTask.id}/collaborators`,
         { email: shareUid }
       );
+      const updatedTask = resp.data;
+      
+      // Preservar owner info si no viene en la respuesta
+      if ((!updatedTask.owner || !updatedTask.owner.uid) && shareTask.owner) {
+        updatedTask.owner = shareTask.owner;
+      }
+      
       setTasks((prev) =>
-        prev.map((t) => (t.id === shareTask.id ? resp.data : t))
+        prev.map((t) => (t.id === shareTask.id ? updatedTask : t))
       );
       setShareUid("");
       // update local shareTask reference
-      setShareTask(resp.data);
+      setShareTask(updatedTask);
+      
+      toast({
+        title: "✅ Colaborador agregado",
+        description: "El colaborador se ha añadido exitosamente"
+      });
     } catch (error) {
       console.error("Error adding collaborator:", error);
+      
+      toast({
+        title: "❌ Error al agregar colaborador",
+        description: getErrorMessage(error),
+        variant: "destructive"
+      });
     }
   };
 
@@ -289,12 +425,30 @@ const TodoApp = () => {
           identifier
         )}`
       );
+      const updatedTask = resp.data;
+      
+      // Preservar owner info si no viene en la respuesta
+      if ((!updatedTask.owner || !updatedTask.owner.uid) && shareTask.owner) {
+        updatedTask.owner = shareTask.owner;
+      }
+      
       setTasks((prev) =>
-        prev.map((t) => (t.id === shareTask.id ? resp.data : t))
+        prev.map((t) => (t.id === shareTask.id ? updatedTask : t))
       );
-      setShareTask(resp.data);
+      setShareTask(updatedTask);
+      
+      toast({
+        title: "✅ Colaborador eliminado",
+        description: "El colaborador se ha removido correctamente"
+      });
     } catch (error) {
       console.error("Error removing collaborator:", error);
+      
+      toast({
+        title: "❌ Error al eliminar colaborador",
+        description: getErrorMessage(error),
+        variant: "destructive"
+      });
     }
   };
 
@@ -321,21 +475,41 @@ const TodoApp = () => {
   const handleLogout = async () => {
     try {
       await logout();
+      toast({
+        title: "Sesión cerrada",
+        description: "Has cerrado sesión exitosamente"
+      });
     } catch (error) {
       console.error("Error logging out:", error);
       logger.error(
         `Error logging out: ${error?.message || error}`,
         user?.email
       );
+      
+      toast({
+        title: "❌ Error al cerrar sesión",
+        description: getErrorMessage(error),
+        variant: "destructive"
+      });
     }
   };
 
-  // Initial load
+  // Cargar tareas cuando el usuario cambia o cambia el filtro
   useEffect(() => {
+    // Actualizar la referencia del usuario actual
+    currentUserUidRef.current = user?.uid;
+    
+    // Limpiar tareas inmediatamente al cambiar de usuario
+    setTasks([]);
+    
     if (user) {
+      setLoading(true);
+      // Fetch de las nuevas tareas
       fetchTasks();
+    } else {
+      setLoading(false);
     }
-  }, [user, taskFilter]);
+  }, [user?.uid, taskFilter]); // user?.uid detecta cambios de cuenta
 
   // Search functionality
   useEffect(() => {
@@ -346,7 +520,7 @@ const TodoApp = () => {
 
       return () => clearTimeout(timeoutId);
     }
-  }, [searchQuery, user, taskFilter]);
+  }, [searchQuery, taskFilter]); // Removido 'user' para evitar duplicación
 
   if (loading) {
     return (
@@ -359,15 +533,15 @@ const TodoApp = () => {
   return (
     <>
       <div className="min-h-screen bg-gray-50">
-        <div className="max-w-4xl mx-auto px-4 py-8">
+        <div className="max-w-6xl mx-auto px-4 py-8">
           {/* Header with user info */}
           <div className="mb-8 flex justify-between items-start">
             <div>
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                Lista de Tareas
+                Gestor de Tareas colaborativo
               </h1>
               <p className="text-gray-600">
-                Organiza y gestiona tus tareas diarias
+                Gestiona tareas y servicios desde un solo lugar
               </p>
             </div>
 
@@ -390,355 +564,370 @@ const TodoApp = () => {
             </div>
           </div>
 
-          {/* Search and Add */}
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-              <Input
-                placeholder="Buscar tareas..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 bg-white border-gray-200"
-              />
-            </div>
+          {/* System Status - shown once for the entire app */}
+          <SystemStatus />
 
-            {/* Filtros de tareas */}
-            <div className="flex gap-2">
-              <Button
-                variant={taskFilter === "all" ? "default" : "outline"}
-                onClick={() => setTaskFilter("all")}
-                size="sm"
-              >
-                Todas
-              </Button>
-              <Button
-                variant={taskFilter === "owned" ? "default" : "outline"}
-                onClick={() => setTaskFilter("owned")}
-                size="sm"
-              >
-                Propias
-              </Button>
-              <Button
-                variant={taskFilter === "collaborator" ? "default" : "outline"}
-                onClick={() => setTaskFilter("collaborator")}
-                size="sm"
-              >
-                Colaboración
-              </Button>
-            </div>
+          {/* Navigation Tabs */}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+            <TabsList className="grid w-full grid-cols-2 lg:w-400">
+              <TabsTrigger value="tasks" className="flex items-center space-x-2">
+                <ListTodo className="w-4 h-4" />
+                <span>Tareas</span>
+              </TabsTrigger>
+              <TabsTrigger value="services" className="flex items-center space-x-2">
+                <Server className="w-4 h-4" />
+                <span>Service Registry</span>
+              </TabsTrigger>
+            </TabsList>
 
-            <Dialog
-              open={isCreateDialogOpen}
-              onOpenChange={setIsCreateDialogOpen}
-            >
-              <DialogTrigger asChild>
-                <Button className="bg-gray-900 hover:bg-gray-800 text-white">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nueva Tarea
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="bg-white">
-                <DialogHeader>
-                  <DialogTitle>Crear Nueva Tarea</DialogTitle>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                  <div>
-                    <Input
-                      placeholder="Título de la tarea"
-                      value={formData.title}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          title: e.target.value,
-                        }))
-                      }
-                      required
-                      className="border-gray-200"
-                    />
-                  </div>
-                  <div>
-                    <Textarea
-                      placeholder="Descripción (opcional)"
-                      value={formData.description}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          description: e.target.value,
-                        }))
-                      }
-                      className="border-gray-200 min-h-[80px]"
-                    />
-                  </div>
-                  <div>
-                    <Input
-                      type="date"
-                      value={formData.due_date}
-                      onChange={(e) =>
-                        setFormData((prev) => ({
-                          ...prev,
-                          due_date: e.target.value,
-                        }))
-                      }
-                      className="border-gray-200"
-                    />
-                  </div>
-                  <div className="flex gap-2 pt-2">
-                    <Button
-                      type="submit"
-                      className="bg-gray-900 hover:bg-gray-800 text-white"
-                    >
-                      Crear Tarea
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setIsCreateDialogOpen(false)}
-                      className="border-gray-200"
-                    >
-                      Cancelar
-                    </Button>
-                  </div>
-                </form>
-              </DialogContent>
-            </Dialog>
-          </div>
-
-          {/* Edit Dialog */}
-          <Dialog
-            open={!!editingTask}
-            onOpenChange={() => setEditingTask(null)}
-          >
-            <DialogContent className="bg-white">
-              <DialogHeader>
-                <DialogTitle>Editar Tarea</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
+            {/* Tasks Tab */}
+            <TabsContent value="tasks" className="space-y-6">
+              {/* Search and Add */}
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                   <Input
-                    placeholder="Título de la tarea"
-                    value={formData.title}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        title: e.target.value,
-                      }))
-                    }
-                    required
-                    className="border-gray-200"
+                    placeholder="Buscar tareas..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 bg-white border-gray-200"
                   />
                 </div>
-                <div>
-                  <Textarea
-                    placeholder="Descripción (opcional)"
-                    value={formData.description}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        description: e.target.value,
-                      }))
-                    }
-                    className="border-gray-200 min-h-[80px]"
-                  />
-                </div>
-                <div>
-                  <Input
-                    type="date"
-                    value={formData.due_date}
-                    onChange={(e) =>
-                      setFormData((prev) => ({
-                        ...prev,
-                        due_date: e.target.value,
-                      }))
-                    }
-                    className="border-gray-200"
-                  />
-                </div>
-                <div className="flex gap-2 pt-2">
+
+                {/* Filtros de tareas */}
+                <div className="flex gap-2">
                   <Button
-                    type="submit"
-                    className="bg-gray-900 hover:bg-gray-800 text-white"
+                    variant={taskFilter === "all" ? "default" : "outline"}
+                    onClick={() => setTaskFilter("all")}
+                    size="sm"
                   >
-                    Guardar Cambios
+                    Todas
                   </Button>
                   <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setEditingTask(null)}
-                    className="border-gray-200"
+                    variant={taskFilter === "owned" ? "default" : "outline"}
+                    onClick={() => setTaskFilter("owned")}
+                    size="sm"
                   >
-                    Cancelar
+                    Propias
+                  </Button>
+                  <Button
+                    variant={taskFilter === "collaborator" ? "default" : "outline"}
+                    onClick={() => setTaskFilter("collaborator")}
+                    size="sm"
+                  >
+                    Colaboración
                   </Button>
                 </div>
-              </form>
-            </DialogContent>
-          </Dialog>
 
-          {/* Tasks List */}
-          <div className="space-y-3">
-            {tasks.length === 0 ? (
-              <Card className="bg-white border-gray-200">
-                <CardContent className="p-8 text-center">
-                  <div className="text-gray-400 mb-2">
-                    <Circle className="h-12 w-12 mx-auto mb-4" />
-                  </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">
-                    {searchQuery ? "No se encontraron tareas" : "No hay tareas"}
-                  </h3>
-                  <p className="text-gray-500">
-                    {searchQuery
-                      ? "Intenta con diferentes términos de búsqueda"
-                      : "Crea tu primera tarea para comenzar"}
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              tasks.map((task) => (
-                <Card
-                  key={task.id}
-                  className="bg-white border-gray-200 hover:border-gray-300 transition-colors"
+                <Dialog
+                  open={isCreateDialogOpen}
+                  onOpenChange={setIsCreateDialogOpen}
                 >
-                  <CardContent className="p-4">
-                    <div className="flex items-start gap-3">
-                      <button
-                        onClick={() => toggleTaskCompletion(task.id)}
-                        className="mt-1 text-gray-400 hover:text-gray-600 transition-colors"
-                      >
-                        {task.completed ? (
-                          <CheckCircle2 className="h-5 w-5 text-green-600" />
-                        ) : (
-                          <Circle className="h-5 w-5" />
-                        )}
-                      </button>
-
-                      <div className="flex-1 min-w-0">
-                        <div
-                          className={`text-lg font-medium ${
-                            task.completed
-                              ? "line-through text-gray-500"
-                              : "text-gray-900"
-                          }`}
+                  <DialogTrigger asChild>
+                    <Button className="bg-gray-900 hover:bg-gray-800 text-white">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Nueva Tarea
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="bg-white">
+                    <DialogHeader>
+                      <DialogTitle>Crear Nueva Tarea</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                      <div>
+                        <Input
+                          placeholder="Título de la tarea"
+                          value={formData.title}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              title: e.target.value,
+                            }))
+                          }
+                          required
+                          className="border-gray-200"
+                        />
+                      </div>
+                      <div>
+                        <Textarea
+                          placeholder="Descripción (opcional)"
+                          value={formData.description}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              description: e.target.value,
+                            }))
+                          }
+                          className="border-gray-200 min-h-[80px]"
+                        />
+                      </div>
+                      <div>
+                        <Input
+                          type="date"
+                          value={formData.due_date}
+                          onChange={(e) =>
+                            setFormData((prev) => ({
+                              ...prev,
+                              due_date: e.target.value,
+                            }))
+                          }
+                          className="border-gray-200"
+                        />
+                      </div>
+                      <div className="flex gap-2 pt-2">
+                        <Button
+                          type="submit"
+                          className="bg-gray-900 hover:bg-gray-800 text-white"
                         >
-                          {task.title}
-                        </div>
+                          Crear Tarea
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setIsCreateDialogOpen(false)}
+                          className="border-gray-200"
+                        >
+                          Cancelar
+                        </Button>
+                      </div>
+                    </form>
+                  </DialogContent>
+                </Dialog>
+              </div>
 
-                        {task.description && (
-                          <p
-                            className={`mt-1 text-sm ${
-                              task.completed ? "text-gray-400" : "text-gray-600"
-                            }`}
+              {/* Edit Dialog */}
+              <Dialog
+                open={!!editingTask}
+                onOpenChange={() => setEditingTask(null)}
+              >
+                <DialogContent className="bg-white">
+                  <DialogHeader>
+                    <DialogTitle>Editar Tarea</DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={handleSubmit} className="space-y-4">
+                    <div>
+                      <Input
+                        placeholder="Título de la tarea"
+                        value={formData.title}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            title: e.target.value,
+                          }))
+                        }
+                        required
+                        className="border-gray-200"
+                      />
+                    </div>
+                    <div>
+                      <Textarea
+                        placeholder="Descripción (opcional)"
+                        value={formData.description}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            description: e.target.value,
+                          }))
+                        }
+                        className="border-gray-200 min-h-[80px]"
+                      />
+                    </div>
+                    <div>
+                      <Input
+                        type="date"
+                        value={formData.due_date}
+                        onChange={(e) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            due_date: e.target.value,
+                          }))
+                        }
+                        className="border-gray-200"
+                      />
+                    </div>
+                    <div className="flex gap-2 pt-2">
+                      <Button
+                        type="submit"
+                        className="bg-gray-900 hover:bg-gray-800 text-white"
+                      >
+                        Guardar Cambios
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setEditingTask(null)}
+                        className="border-gray-200"
+                      >
+                        Cancelar
+                      </Button>
+                    </div>
+                  </form>
+                </DialogContent>
+              </Dialog>
+
+              {/* Tasks List */}
+              <div className="space-y-3">
+                {tasks.length === 0 ? (
+                  <Card className="bg-white border-gray-200">
+                    <CardContent className="p-8 text-center">
+                      <div className="text-gray-400 mb-2">
+                        <Circle className="h-12 w-12 mx-auto mb-4" />
+                      </div>
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">
+                        {searchQuery ? "No se encontraron tareas" : "No hay tareas"}
+                      </h3>
+                      <p className="text-gray-500">
+                        {searchQuery
+                          ? "Intenta con diferentes términos de búsqueda"
+                          : "Crea tu primera tarea para comenzar"}
+                      </p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  tasks.map((task) => (
+                    <Card
+                      key={task.id}
+                      className="bg-white border-gray-200 hover:border-gray-300 transition-colors"
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-start gap-3">
+                          <button
+                            onClick={() => toggleTaskCompletion(task.id)}
+                            className="mt-1 text-gray-400 hover:text-gray-600 transition-colors"
                           >
-                            {task.description}
-                          </p>
-                        )}
+                            {task.completed ? (
+                              <CheckCircle2 className="h-5 w-5 text-green-600" />
+                            ) : (
+                              <Circle className="h-5 w-5" />
+                            )}
+                          </button>
 
-                        <div className="flex items-center gap-2 mt-2">
-                          {task.due_date && (
-                            <Badge
-                              variant="outline"
-                              className={`text-xs ${
-                                isOverdue(task.due_date) && !task.completed
-                                  ? "border-red-200 text-red-700 bg-red-50"
-                                  : "border-gray-200 text-gray-600"
+                          <div className="flex-1 min-w-0">
+                            <div
+                              className={`text-lg font-medium ${
+                                task.completed
+                                  ? "line-through text-gray-500"
+                                  : "text-gray-900"
                               }`}
                             >
-                              <Calendar className="h-3 w-3 mr-1" />
-                              {formatDate(task.due_date)}
-                            </Badge>
-                          )}
+                              {task.title}
+                            </div>
 
-                          {task.completed && (
-                            <Badge
-                              variant="outline"
-                              className="text-xs border-green-200 text-green-700 bg-green-50"
-                            >
-                              Completada
-                            </Badge>
-                          )}
+                            {task.description && (
+                              <p
+                                className={`mt-1 text-sm ${
+                                  task.completed ? "text-gray-400" : "text-gray-600"
+                                }`}
+                              >
+                                {task.description}
+                              </p>
+                            )}
 
-                          {/* Mostrar si la tarea fue compartida contigo */}
-                          {task.invited_by && (
-                            <Badge
-                              variant="outline"
-                              className="text-xs border-purple-200 text-purple-700 bg-purple-50"
-                            >
-                              Compartida por {task.invited_by.invited_by_name || task.invited_by.invited_by_email}
-                            </Badge>
-                          )}
+                            <div className="flex items-center gap-2 mt-2">
+                              {task.due_date && (
+                                <Badge
+                                  variant="outline"
+                                  className={`text-xs ${
+                                    isOverdue(task.due_date) && !task.completed
+                                      ? "border-red-200 text-red-700 bg-red-50"
+                                      : "border-gray-200 text-gray-600"
+                                  }`}
+                                >
+                                  <Calendar className="h-3 w-3 mr-1" />
+                                  {formatDate(task.due_date)}
+                                </Badge>
+                              )}
 
-                          {/* Mostrar owner */}
-                          {task.owner && (
-                            <Badge
-                              variant="outline"
-                              className="text-xs border-blue-200 text-blue-700 bg-blue-50"
+                              {task.completed && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-xs border-green-200 text-green-700 bg-green-50"
+                                >
+                                  Completada
+                                </Badge>
+                              )}
+
+                              {/* Mostrar si la tarea fue compartida contigo */}
+                              {task.invited_by && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-xs border-purple-200 text-purple-700 bg-purple-50"
+                                >
+                                  Compartida por {task.invited_by.invited_by_name || task.invited_by.invited_by_email}
+                                </Badge>
+                              )}
+
+                              {/* Mostrar owner */}
+                              {task.owner && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-xs border-blue-200 text-blue-700 bg-blue-50"
+                                >
+                                  <User className="h-3 w-3 mr-1" />
+                                  Creada por {task.owner.display_name || task.owner.email}
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => startEditing(task)}
+                              className="text-gray-400 hover:text-gray-600"
                             >
-                              <User className="h-3 w-3 mr-1" />
-                              Creada por {task.owner.display_name || task.owner.email}
-                            </Badge>
-                          )}
+                              <Edit3 className="h-4 w-4" />
+                            </Button>
+                            
+                            {/* Mostrar botones de eliminar y compartir solo para el propietario */}
+                            {(task.owner?.uid === user?.uid) && (
+                              <>
+                               <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => openShareDialog(task)}
+                                    className="text-gray-400 hover:text-gray-600"
+                                    title="Compartir"
+                                  >
+                                    <User className="h-4 w-4" />
+                                  </Button>
+                                
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => deleteTask(task.id)}
+                                  className="text-gray-400 hover:text-red-600"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </>
+                            )}
+                          </div>
                         </div>
-                      </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </div>
+            </TabsContent>
 
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => startEditing(task)}
-                          className="text-gray-400 hover:text-gray-600"
-                        >
-                          <Edit3 className="h-4 w-4" />
-                        </Button>
-                        
-                        {/* Mostrar botones de eliminar y compartir solo para el propietario */}
+            {/* Services Tab */}
+            <TabsContent value="services">
+              <ServiceRegistry />
+            </TabsContent>
+          </Tabs>
 
-                    {(task.owner?.uid === user?.uid) && (
-                      <>
-                       <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => openShareDialog(task)}
-                            className="text-gray-400 hover:text-gray-600"
-                            title="Compartir"
-                          >
-                            <User className="h-4 w-4" />
-                          </Button>
-                        
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => deleteTask(task.id)}
-                          className="text-gray-400 hover:text-red-600"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </>
-                    )}
-                    {/* Mostrar botones de editar para colaboradores*/}
-                      {(task.owner?.uid === user?.uid || 
-                        task.collaborators?.some(collab => 
-                        collab.email === user?.email
-                        )) && (
-                        <>
-                        
-
-                         
-                        </>
-                      )}
-                    </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            )}
-          </div>
-
-          {/* Footer */}
-          <div className="mt-12 text-center text-sm text-gray-500">
-            <p>Total de tareas: {tasks.length}</p>
-            <p>
-              Completadas: {tasks.filter((t) => t.completed).length} |
-              Pendientes: {tasks.filter((t) => !t.completed).length}
-            </p>
-          </div>
+          {/* Footer para la tab de tareas */}
+          {activeTab === "tasks" && (
+            <div className="mt-12 text-center text-sm text-gray-500">
+              <p>Total de tareas: {tasks.length}</p>
+              <p>
+                Completadas: {tasks.filter((t) => t.completed).length} |
+                Pendientes: {tasks.filter((t) => !t.completed).length}
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -892,6 +1081,7 @@ function App() {
   return (
     <AuthProvider>
       <AppContent />
+      <Toaster />
     </AuthProvider>
   );
 }

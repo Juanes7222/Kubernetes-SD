@@ -11,25 +11,25 @@ router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 
 @router.post("", response_model=Task)
-def create_task(
+async def create_task(
     task_input: TaskCreate,
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     task_dict = task_input.model_dump()
-    created_task = firebase_service.create_task(task_dict, current_user["uid"])
+    created_task = await firebase_service.create_task(task_dict, current_user["uid"])
     write("info", "create_task", name=__name__, user=current_user.get("email") or current_user.get("uid"), task_id=created_task.get("id"), title=created_task.get("title"))
     return Task(**created_task)
 
 
 @router.get("", response_model=List[Task])
-def get_tasks(
+async def get_tasks(
     filter_by: Optional[str] = None, # owned / collaborator
     search: Optional[str] = None,
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     logger.info(f"get_tasks called with filter_by={filter_by}, search={search}, user={current_user.get('email')}")
     
-    all_tasks = firebase_service.get_tasks(current_user["uid"], search)
+    all_tasks = await firebase_service.get_tasks(current_user["uid"], search)
     if filter_by == "owned":
         tasks = [task for task in all_tasks if task.get("owner", {}).get("uid") == current_user["uid"]]
     elif filter_by == "collaborator":
@@ -42,14 +42,14 @@ def get_tasks(
 
 
 @router.get("/debug", response_model=Dict[str, Any])
-def debug_tasks(
+async def debug_tasks(
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
     """Debug endpoint to see raw task data"""
     user_id = current_user["uid"]
     
     # Get all task
-    all_tasks = firebase_service.get_tasks(user_id)
+    all_tasks = await firebase_service.get_tasks(user_id)
     
     return {
         "user_id": user_id,
@@ -60,11 +60,11 @@ def debug_tasks(
 
 
 @router.get("/{task_id}", response_model=Task)
-def get_task(
+async def get_task(
     task_id: str,
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
-    task = firebase_service.get_task_by_id(task_id, current_user["uid"])
+    task = await firebase_service.get_task_by_id(task_id, current_user["uid"])
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     write("info", "get_task", name=__name__, user=current_user.get("email") or current_user.get("uid"), task_id=task_id)
@@ -72,12 +72,12 @@ def get_task(
 
 
 @router.put("/{task_id}", response_model=Task)
-def update_task(
+async def update_task(
     task_id: str,
     task_update: TaskUpdate,
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
-    updated_task = firebase_service.update_task(
+    updated_task = await firebase_service.update_task(
         task_id,
         current_user["uid"],
         task_update.model_dump(exclude_unset=True)
@@ -89,11 +89,11 @@ def update_task(
 
 
 @router.delete("/{task_id}")
-def delete_task(
+async def delete_task(
     task_id: str,
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
-    success = firebase_service.delete_task(task_id, current_user["uid"])
+    success = await firebase_service.delete_task(task_id, current_user["uid"])
     if not success:
         raise HTTPException(status_code=404, detail="Task not found")
     write("info", "delete_task", name=__name__, user=current_user.get("email") or current_user.get("uid"), task_id=task_id)
@@ -101,11 +101,11 @@ def delete_task(
 
 
 @router.patch("/{task_id}/toggle", response_model=Task)
-def toggle_task_completion(
+async def toggle_task_completion(
     task_id: str,
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
-    toggled_task = firebase_service.toggle_task_completion(task_id, current_user["uid"])
+    toggled_task = await firebase_service.toggle_task_completion(task_id, current_user["uid"])
     if not toggled_task:
         raise HTTPException(status_code=404, detail="Task not found")
     write("info", "toggle_task", name=__name__, user=current_user.get("email") or current_user.get("uid"), task_id=task_id, new_completed=toggled_task.get("completed"))
@@ -113,7 +113,7 @@ def toggle_task_completion(
 
 
 @router.post("/{task_id}/collaborators", response_model=Task)
-def add_collaborator(
+async def add_collaborator(
     task_id: str,
     payload: CollaboratorIn,
     current_user: Dict[str, Any] = Depends(get_current_user)
@@ -121,7 +121,7 @@ def add_collaborator(
     identifier = payload.email if payload.email else payload.uid
     if not identifier:
         raise HTTPException(status_code=400, detail="Provide email or uid of collaborator")
-    updated = firebase_service.add_collaborator(task_id, current_user["uid"], identifier)
+    updated = await firebase_service.add_collaborator(task_id, current_user["uid"], identifier)
     if not updated:
         raise HTTPException(status_code=404, detail="Task not found or permission denied")
     write("info", "add_collaborator", name=__name__, user=current_user.get("email") or current_user.get("uid"), task_id=task_id, added=identifier)
@@ -129,12 +129,12 @@ def add_collaborator(
 
 
 @router.delete("/{task_id}/collaborators/{collab_uid}", response_model=Task)
-def remove_collaborator(
+async def remove_collaborator(
     task_id: str,
     collab_uid: str,
     current_user: Dict[str, Any] = Depends(get_current_user)
 ):
-    updated = firebase_service.remove_collaborator(task_id, current_user["uid"], collab_uid)
+    updated = await firebase_service.remove_collaborator(task_id, current_user["uid"], collab_uid)
     if not updated:
         raise HTTPException(status_code=404, detail="Task not found or permission denied")
     write("info", "remove_collaborator", name=__name__, user=current_user.get("email") or current_user.get("uid"), task_id=task_id, removed=collab_uid)
