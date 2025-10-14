@@ -8,6 +8,16 @@ import { useToast } from '../../hooks/use-toast';
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 
+// Extraer el host del BACKEND_URL para mostrarlo en la UI
+const getBackendHost = () => {
+  try {
+    const url = new URL(BACKEND_URL);
+    return url.hostname;
+  } catch {
+    return 'localhost';
+  }
+};
+
 const ServiceRegistry = () => {
   const [backendStatus, setBackendStatus] = useState('checking');
   const [frontendStatus, setFrontendStatus] = useState('active');
@@ -150,7 +160,9 @@ const ServiceRegistry = () => {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="font-medium">Ubicación:</span>
-                    <span className="text-gray-600">localhost</span>
+                    <span className="text-gray-600">
+                      {window.location.hostname}
+                    </span>
                   </div>
                 </div>
                 <Badge className={getStatusColor(frontendStatus)}>
@@ -213,7 +225,7 @@ const ServiceRegistry = () => {
                   </div>
                   <div className="flex justify-between text-sm">
                     <span className="font-medium">Ubicación:</span>
-                    <span className="text-gray-600">localhost</span>
+                    <span className="text-gray-600">{getBackendHost()}</span>
                   </div>
                 </div>
                 <Badge className={getStatusColor(backendStatus)}>
